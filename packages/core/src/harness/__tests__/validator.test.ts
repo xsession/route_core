@@ -12,6 +12,7 @@ function makeComponent(overrides: Partial<Component> = {}): Component {
     partNumber: '',
     category: 'connector',
     type: 'free_hanging',
+    shape: 'rectangular',
     pins: [
       { id: 'p1', label: '1', position: { x: 0, y: 5 }, direction: 'left', signalType: 'signal', gender: 'neutral' },
       { id: 'p2', label: '2', position: { x: 0, y: 15 }, direction: 'left', signalType: 'power', currentRating: 10, gender: 'neutral' },

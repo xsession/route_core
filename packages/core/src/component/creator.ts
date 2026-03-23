@@ -1,10 +1,11 @@
-import type { Component, ComponentCategory, ComponentType, Footprint } from '../models/component.js';
+import type { Component, ComponentCategory, ComponentType, ComponentShape, Footprint } from '../models/component.js';
 import type { Pin, PinSignalType } from '../models/pin.js';
 import { generateId } from '../models/harness.js';
 
 export interface ComponentTemplate {
   name: string;
   category: ComponentCategory;
+  shape: ComponentShape;
   pinCount: number;
   pinLayout: Footprint['pinLayout'];
   defaultPinSignal: PinSignalType;
@@ -12,29 +13,39 @@ export interface ComponentTemplate {
 
 // Pre-defined templates for common component types
 export const COMPONENT_TEMPLATES: ComponentTemplate[] = [
-  { name: '2-Pin Connector', category: 'connector', pinCount: 2, pinLayout: 'single_row', defaultPinSignal: 'power' },
-  { name: '4-Pin Connector', category: 'connector', pinCount: 4, pinLayout: 'single_row', defaultPinSignal: 'signal' },
-  { name: '6-Pin Connector', category: 'connector', pinCount: 6, pinLayout: 'dual_row', defaultPinSignal: 'signal' },
-  { name: '8-Pin Connector', category: 'connector', pinCount: 8, pinLayout: 'dual_row', defaultPinSignal: 'signal' },
-  { name: 'DB9', category: 'connector', pinCount: 9, pinLayout: 'dual_row', defaultPinSignal: 'data' },
-  { name: 'DB15', category: 'connector', pinCount: 15, pinLayout: 'dual_row', defaultPinSignal: 'data' },
-  { name: 'DB25', category: 'connector', pinCount: 25, pinLayout: 'dual_row', defaultPinSignal: 'data' },
-  { name: 'Terminal Block 2P', category: 'terminal', pinCount: 2, pinLayout: 'single_row', defaultPinSignal: 'power' },
-  { name: 'Terminal Block 4P', category: 'terminal', pinCount: 4, pinLayout: 'single_row', defaultPinSignal: 'power' },
-  { name: 'Terminal Block 8P', category: 'terminal', pinCount: 8, pinLayout: 'single_row', defaultPinSignal: 'power' },
-  { name: 'Terminal Block 12P', category: 'terminal', pinCount: 12, pinLayout: 'single_row', defaultPinSignal: 'power' },
-  { name: 'Relay SPDT', category: 'relay', pinCount: 5, pinLayout: 'custom', defaultPinSignal: 'power' },
-  { name: 'Relay DPDT', category: 'relay', pinCount: 8, pinLayout: 'custom', defaultPinSignal: 'power' },
-  { name: 'Motor 3-Phase', category: 'motor', pinCount: 3, pinLayout: 'circular', defaultPinSignal: 'power' },
-  { name: 'DC Motor', category: 'motor', pinCount: 2, pinLayout: 'single_row', defaultPinSignal: 'power' },
-  { name: 'Fuse Holder', category: 'fuse', pinCount: 2, pinLayout: 'single_row', defaultPinSignal: 'power' },
-  { name: 'Circuit Breaker 1P', category: 'circuit_breaker', pinCount: 2, pinLayout: 'single_row', defaultPinSignal: 'power' },
-  { name: 'Circuit Breaker 2P', category: 'circuit_breaker', pinCount: 4, pinLayout: 'dual_row', defaultPinSignal: 'power' },
-  { name: 'Power Supply', category: 'power_supply', pinCount: 4, pinLayout: 'single_row', defaultPinSignal: 'power' },
-  { name: 'Sensor 3-Wire', category: 'sensor', pinCount: 3, pinLayout: 'single_row', defaultPinSignal: 'signal' },
-  { name: 'Toggle Switch', category: 'switch', pinCount: 3, pinLayout: 'single_row', defaultPinSignal: 'power' },
-  { name: 'M12 4-Pin', category: 'connector', pinCount: 4, pinLayout: 'circular', defaultPinSignal: 'signal' },
-  { name: 'M12 8-Pin', category: 'connector', pinCount: 8, pinLayout: 'circular', defaultPinSignal: 'signal' },
+  { name: '2-Pin Connector', category: 'connector', shape: 'rectangular', pinCount: 2, pinLayout: 'single_row', defaultPinSignal: 'power' },
+  { name: '4-Pin Connector', category: 'connector', shape: 'rectangular', pinCount: 4, pinLayout: 'single_row', defaultPinSignal: 'signal' },
+  { name: '6-Pin Connector', category: 'connector', shape: 'rectangular', pinCount: 6, pinLayout: 'dual_row', defaultPinSignal: 'signal' },
+  { name: '8-Pin Connector', category: 'connector', shape: 'rectangular', pinCount: 8, pinLayout: 'dual_row', defaultPinSignal: 'signal' },
+  { name: 'DB9', category: 'connector', shape: 'd_sub', pinCount: 9, pinLayout: 'dual_row', defaultPinSignal: 'data' },
+  { name: 'DB15', category: 'connector', shape: 'd_sub', pinCount: 15, pinLayout: 'dual_row', defaultPinSignal: 'data' },
+  { name: 'DB25', category: 'connector', shape: 'd_sub', pinCount: 25, pinLayout: 'dual_row', defaultPinSignal: 'data' },
+  { name: 'USB Type-A', category: 'connector', shape: 'usb', pinCount: 4, pinLayout: 'single_row', defaultPinSignal: 'data' },
+  { name: 'USB Type-C', category: 'connector', shape: 'usb', pinCount: 24, pinLayout: 'dual_row', defaultPinSignal: 'data' },
+  { name: 'Terminal Block 2P', category: 'terminal', shape: 'terminal_block', pinCount: 2, pinLayout: 'single_row', defaultPinSignal: 'power' },
+  { name: 'Terminal Block 4P', category: 'terminal', shape: 'terminal_block', pinCount: 4, pinLayout: 'single_row', defaultPinSignal: 'power' },
+  { name: 'Terminal Block 8P', category: 'terminal', shape: 'terminal_block', pinCount: 8, pinLayout: 'single_row', defaultPinSignal: 'power' },
+  { name: 'Terminal Block 12P', category: 'terminal', shape: 'terminal_block', pinCount: 12, pinLayout: 'single_row', defaultPinSignal: 'power' },
+  { name: 'Ferrule', category: 'terminal', shape: 'ferrule', pinCount: 1, pinLayout: 'single_row', defaultPinSignal: 'power' },
+  { name: 'Ring Terminal', category: 'terminal', shape: 'ring_terminal', pinCount: 1, pinLayout: 'single_row', defaultPinSignal: 'power' },
+  { name: 'Quick Disconnect', category: 'terminal', shape: 'quick_disconnect', pinCount: 1, pinLayout: 'single_row', defaultPinSignal: 'power' },
+  { name: 'Relay SPDT', category: 'relay', shape: 'rectangular', pinCount: 5, pinLayout: 'custom', defaultPinSignal: 'power' },
+  { name: 'Relay DPDT', category: 'relay', shape: 'rectangular', pinCount: 8, pinLayout: 'custom', defaultPinSignal: 'power' },
+  { name: 'Motor 3-Phase', category: 'motor', shape: 'circular', pinCount: 3, pinLayout: 'circular', defaultPinSignal: 'power' },
+  { name: 'DC Motor', category: 'motor', shape: 'circular', pinCount: 2, pinLayout: 'single_row', defaultPinSignal: 'power' },
+  { name: 'Fuse Holder', category: 'fuse', shape: 'rectangular', pinCount: 2, pinLayout: 'single_row', defaultPinSignal: 'power' },
+  { name: 'Circuit Breaker 1P', category: 'circuit_breaker', shape: 'rectangular', pinCount: 2, pinLayout: 'single_row', defaultPinSignal: 'power' },
+  { name: 'Circuit Breaker 2P', category: 'circuit_breaker', shape: 'rectangular', pinCount: 4, pinLayout: 'dual_row', defaultPinSignal: 'power' },
+  { name: 'Power Supply', category: 'power_supply', shape: 'rectangular', pinCount: 4, pinLayout: 'single_row', defaultPinSignal: 'power' },
+  { name: 'Sensor 3-Wire', category: 'sensor', shape: 'circular', pinCount: 3, pinLayout: 'single_row', defaultPinSignal: 'signal' },
+  { name: 'Toggle Switch', category: 'switch', shape: 'rectangular', pinCount: 3, pinLayout: 'single_row', defaultPinSignal: 'power' },
+  { name: 'Push Button NO', category: 'push_button', shape: 'circular', pinCount: 2, pinLayout: 'single_row', defaultPinSignal: 'signal' },
+  { name: 'M12 4-Pin', category: 'connector', shape: 'circular', pinCount: 4, pinLayout: 'circular', defaultPinSignal: 'signal' },
+  { name: 'M12 8-Pin', category: 'connector', shape: 'circular', pinCount: 8, pinLayout: 'circular', defaultPinSignal: 'signal' },
+  { name: 'Splice', category: 'splice', shape: 'generic', pinCount: 2, pinLayout: 'single_row', defaultPinSignal: 'power' },
+  { name: 'Battery 2-Pin', category: 'battery', shape: 'rectangular', pinCount: 2, pinLayout: 'single_row', defaultPinSignal: 'power' },
+  { name: 'Fan 2-Pin', category: 'fan', shape: 'rectangular', pinCount: 2, pinLayout: 'single_row', defaultPinSignal: 'power' },
+  { name: 'Fan 4-Pin PWM', category: 'fan', shape: 'rectangular', pinCount: 4, pinLayout: 'single_row', defaultPinSignal: 'signal' },
 ];
 
 /**
@@ -67,6 +78,7 @@ export class ComponentCreator {
       partNumber: '',
       category: template.category,
       type: 'free_hanging',
+      shape: template.shape,
       pins,
       footprint,
       description: '',
@@ -83,6 +95,7 @@ export class ComponentCreator {
     name: string;
     category: ComponentCategory;
     type: ComponentType;
+    shape?: ComponentShape;
     manufacturer?: string;
     partNumber?: string;
     description?: string;
@@ -119,6 +132,7 @@ export class ComponentCreator {
       partNumber: config.partNumber ?? '',
       category: config.category,
       type: config.type,
+      shape: config.shape ?? 'generic',
       pins,
       footprint: this.generateFootprint(config.pins.length, config.pinLayout),
       description: config.description ?? '',

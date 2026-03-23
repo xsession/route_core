@@ -119,9 +119,28 @@ export async function startEmbeddedServer(port: number): Promise<Server> {
     res.send(result.content);
   });
 
-  return new Promise<Server>((resolve) => {
+  return new Promise<Server & { port: number }>((resolve, reject) => {
     const server = app.listen(port, () => {
-      resolve(server);
+      const addr = server.address();
+      const actualPort = typeof addr === 'object' && addr ? addr.port : port;
+      (server as any).port = actualPort;
+      resolve(server as Server & { port: number });
+    });
+
+    server.on('error', (err: NodeJS.ErrnoException) => {
+      if (err.code === 'EADDRINUSE') {
+        console.log(`[Route Core] Port ${port} in use, finding a free port...`);
+        // Let the OS assign a free port
+        const fallback = app.listen(0, () => {
+          const addr = fallback.address();
+          const actualPort = typeof addr === 'object' && addr ? addr.port : 0;
+          (fallback as any).port = actualPort;
+          resolve(fallback as Server & { port: number });
+        });
+        fallback.on('error', reject);
+      } else {
+        reject(err);
+      }
     });
   });
 }

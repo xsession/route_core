@@ -14,6 +14,7 @@ function makeComponent(overrides: Partial<Component> = {}): Component {
     partNumber: 'AC-100',
     category: 'connector',
     type: 'free_hanging',
+    shape: 'rectangular',
     pins: [
       { id: 'p1', label: '1', position: { x: 0, y: 0 }, direction: 'left', signalType: 'signal', gender: 'neutral' },
     ],
@@ -205,7 +206,7 @@ describe('BomGenerator', () => {
     });
 
     it('escapes CSV special characters', () => {
-      const comp = makeComponent({ description: 'Has "quotes" and, commas' });
+      const comp = makeComponent({ name: 'Has "quotes" and, commas' });
       harness.nodes.push({
         id: 'n1', componentId: comp.id, component: comp,
         position: { x: 0, y: 0 }, rotation: 0, label: 'J1', locked: false,
@@ -213,7 +214,7 @@ describe('BomGenerator', () => {
 
       const bom = generator.generate(harness);
       const csv = generator.toCSV(bom);
-      // Description with special chars should be quoted
+      // Description (mapped from component.name) with special chars should be quoted
       expect(csv).toContain('"Has ""quotes"" and, commas"');
     });
   });

@@ -2,7 +2,7 @@
 setlocal enabledelayedexpansion
 
 :: ============================================================================
-::  Route Core — Fool-Proof Build Script
+::  Route Core -- Fool-Proof Build Script
 ::  Cable Harness Design & Management Platform
 :: ============================================================================
 ::
@@ -20,7 +20,7 @@ setlocal enabledelayedexpansion
 ::
 :: ============================================================================
 
-title Route Core — Build
+title Route Core -- Build
 
 :: ── Colors & Symbols ──
 set "GREEN=[32m"
@@ -65,7 +65,7 @@ goto :ShowHelp
 :: ============================================================================
 :ShowHelp
 echo.
-echo %BOLD%%CYAN%Route Core — Build Script%RESET%
+echo %BOLD%%CYAN%Route Core -- Build Script%RESET%
 echo.
 echo %BOLD%Usage:%RESET%  build_app.bat [target]
 echo.
@@ -88,7 +88,7 @@ goto :End
 :PreflightChecks
 echo.
 echo %BOLD%%CYAN%========================================%RESET%
-echo %BOLD%%CYAN%  Route Core — Preflight Checks%RESET%
+echo %BOLD%%CYAN%  Route Core -- Preflight Checks%RESET%
 echo %BOLD%%CYAN%========================================%RESET%
 echo.
 
@@ -338,6 +338,17 @@ echo %BOLD%%CYAN%  Building @route-core/core (dependency)...%RESET%
 call npm run build:core
 if %errorlevel% neq 0 (
     echo %RED%FATAL: Core build failed.%RESET%
+    goto :Fail
+)
+
+echo.
+echo %BOLD%%CYAN%  Building @route-core/web (dependency for desktop)...%RESET%
+pushd "%ROOT%\packages\web"
+call npx vite build
+set "BUILD_ERR=%errorlevel%"
+popd
+if %BUILD_ERR% neq 0 (
+    echo %RED%FATAL: Web build failed.%RESET%
     goto :Fail
 )
 

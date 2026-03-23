@@ -12,6 +12,7 @@ function makeComponent(id = 'c1'): Component {
     partNumber: '',
     category: 'connector',
     type: 'free_hanging',
+    shape: 'rectangular',
     pins: [
       { id: 'p1', label: '1', position: { x: 0, y: 5 }, direction: 'left', signalType: 'signal', gender: 'neutral' },
       { id: 'p2', label: '2', position: { x: 0, y: 15 }, direction: 'left', signalType: 'power', gender: 'neutral' },
@@ -76,7 +77,7 @@ describe('SvgExporter', () => {
   it('does not show grid by default', () => {
     const harness = createHarness('No Grid', 'T');
     const svg = exporter.export(harness);
-    expect(svg).not.toContain('grid-line');
+    expect(svg).not.toContain('<line class="grid-line"');
   });
 
   it('shows signal labels when enabled', () => {

@@ -12,6 +12,7 @@ function makeNode(id: string, x: number, y: number, pins: Component['pins'] = []
     partNumber: '',
     category: 'connector',
     type: 'free_hanging',
+    shape: 'rectangular',
     pins,
     footprint: { width: 20, height: 30, pinLayout: 'single_row' },
     description: '',

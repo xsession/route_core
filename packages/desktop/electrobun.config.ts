@@ -14,12 +14,14 @@ export default {
       entrypoint: "src/bun/index.ts",
     },
     views: {
+      // Thin shim that sets __ROUTE_CORE_API_BASE__ fallback.
+      // The real React app is copied by the postBuild script.
       mainview: {
         entrypoint: "src/mainview/index.ts",
       },
     },
     copy: {
-      "src/mainview/index.html": "views/mainview/index.html",
+      // Placeholder CSS (React app provides its own styles too)
       "src/mainview/styles.css": "views/mainview/styles.css",
       "../../data/seed/connectors.json": "resources/seed/connectors.json",
     },
@@ -31,6 +33,9 @@ export default {
     },
     linux: {},
     win: {},
+  },
+  scripts: {
+    postBuild: "./scripts/post-build.ts",
   },
   release: {
     baseUrl: "",

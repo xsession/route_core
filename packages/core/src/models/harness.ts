@@ -53,8 +53,12 @@ export interface CanvasState {
   panY: number;
   gridSize: number;
   snapToGrid: boolean;
+  showGrid: boolean;
   showLabels: boolean;
   showPinNumbers: boolean;
+  showWireInfo: boolean;
+  wireUnits: 'awg' | 'mm2';
+  lengthUnits: 'imperial' | 'metric';
 }
 
 export interface Revision {
@@ -74,8 +78,12 @@ export function createDefaultCanvas(): CanvasState {
     panY: 0,
     gridSize: 10,
     snapToGrid: true,
+    showGrid: true,
     showLabels: true,
     showPinNumbers: true,
+    showWireInfo: true,
+    wireUnits: 'awg',
+    lengthUnits: 'metric',
   };
 }
 

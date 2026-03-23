@@ -11,26 +11,36 @@ import { BrowserWindow } from "electrobun/bun";
 import Electrobun from "electrobun/bun";
 import { startEmbeddedServer } from "./server.js";
 
-const API_PORT = 3001;
+const PREFERRED_PORT = 3001;
 
-// Start the embedded API server in-process
-const server = await startEmbeddedServer(API_PORT);
-console.log(`[Route Core] Embedded API server running on port ${API_PORT}`);
+// Start the embedded API server in-process (auto-finds a free port if preferred is taken)
+const server = await startEmbeddedServer(PREFERRED_PORT);
+const apiPort = server.port;
+console.log(`[Route Core] Embedded API server running on port ${apiPort}`);
 
-// Create the main application window
+// Create the main application window.
+// Use `preload` to inject the API port before page scripts run.
+// This is more reliable than dom-ready (which requires the Electrobun browser lib).
 const mainWindow = new BrowserWindow({
-  title: "Route Core — Cable Harness Designer",
+  title: "Route Core -- Cable Harness Designer",
   url: "views://mainview/index.html",
-  width: 1440,
-  height: 900,
-  minWidth: 960,
-  minHeight: 640,
+  preload: `window.__ROUTE_CORE_API_BASE__ = "http://localhost:${apiPort}"; console.log("[Route Core] Preload: API base set to http://localhost:${apiPort}");`,
+  frame: {
+    x: 0,
+    y: 0,
+    width: 1440,
+    height: 900,
+  },
 });
 
 // Handle application quit
 Electrobun.events.on("will-quit", () => {
   console.log("[Route Core] Shutting down...");
   server.close();
+  clearInterval(keepAlive);
 });
+
+// Keep the Bun event loop alive while the native window is open
+const keepAlive = setInterval(() => {}, 30_000);
 
 console.log("[Route Core] Desktop application started");

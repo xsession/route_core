@@ -10,6 +10,7 @@ function makeComponent(overrides: Partial<Component> = {}): Component {
     partNumber: 'B2B-PH-K-S',
     category: 'connector',
     type: 'pcb_mount',
+    shape: 'rectangular',
     pins: [],
     footprint: { width: 20, height: 20, pinLayout: 'single_row' },
     description: 'JST PH series 2-pin header',

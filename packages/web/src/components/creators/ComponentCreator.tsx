@@ -4,6 +4,7 @@ import {
   COMPONENT_TEMPLATES,
   type ComponentCategory,
   type ComponentType,
+  type ComponentShape,
   type PinSignalType,
 } from '@route-core/core';
 import { useHarnessStore } from '../../store/harness-store';
@@ -23,6 +24,7 @@ export function ComponentCreatorPanel() {
   const [pinCount, setPinCount] = useState(2);
   const [pinLayout, setPinLayout] = useState<'single_row' | 'dual_row' | 'grid' | 'circular'>('single_row');
   const [pinSignal, setPinSignal] = useState<PinSignalType>('signal');
+  const [shape, setShape] = useState<ComponentShape>('rectangular');
 
   const handleTemplatePlace = (templateIndex: number) => {
     const template = COMPONENT_TEMPLATES[templateIndex];
@@ -48,6 +50,7 @@ export function ComponentCreatorPanel() {
       partNumber: partNumber || undefined,
       pins,
       pinLayout,
+      shape,
     });
 
     const cx = harness.canvas.width / 2;
@@ -99,6 +102,19 @@ export function ComponentCreatorPanel() {
               <option value="circuit_breaker">Circuit Breaker</option>
               <option value="controller">Controller</option>
               <option value="device">Device</option>
+              <option value="push_button">Push Button</option>
+              <option value="timer">Timer</option>
+              <option value="fan">Fan</option>
+              <option value="pcb">PCB</option>
+              <option value="resistor">Resistor</option>
+              <option value="capacitor">Capacitor</option>
+              <option value="diode">Diode</option>
+              <option value="inductor">Inductor</option>
+              <option value="transformer">Transformer</option>
+              <option value="inverter">Inverter</option>
+              <option value="battery">Battery</option>
+              <option value="solar_cell">Solar Cell</option>
+              <option value="splice">Splice</option>
             </select>
           </label>
 
@@ -148,6 +164,21 @@ export function ComponentCreatorPanel() {
               <option value="data">Data</option>
               <option value="analog">Analog</option>
               <option value="digital">Digital</option>
+            </select>
+          </label>
+
+          <label>
+            Shape
+            <select value={shape} onChange={e => setShape(e.target.value as ComponentShape)}>
+              <option value="rectangular">Rectangular</option>
+              <option value="circular">Circular</option>
+              <option value="usb">USB</option>
+              <option value="d_sub">D-Sub</option>
+              <option value="ferrule">Ferrule</option>
+              <option value="quick_disconnect">Quick Disconnect</option>
+              <option value="ring_terminal">Ring Terminal</option>
+              <option value="terminal_block">Terminal Block</option>
+              <option value="generic">Generic</option>
             </select>
           </label>
 

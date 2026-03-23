@@ -1,4 +1,10 @@
-const API_BASE = '/api';
+// In desktop mode the main process injects the full origin via preload.
+// In web mode (Vite dev / static hosting) we use the relative path so the
+// proxy or same-origin server handles it.
+const API_BASE: string =
+  (typeof window !== 'undefined' && (window as any).__ROUTE_CORE_API_BASE__)
+    ? `${(window as any).__ROUTE_CORE_API_BASE__}/api`
+    : '/api';
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {

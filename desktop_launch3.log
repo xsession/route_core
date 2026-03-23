@@ -1,0 +1,49 @@
+Using config file: electrobun.config.ts
+Ensured launcher has .exe extension on Windows
+Running postBuild script: ./scripts/post-build.ts
+[post-build] ELECTROBUN_BUILD_DIR = c:\GIT\route_core\packages\desktop\build\dev-win-x64
+[post-build] cwd = c:\GIT\route_core\packages\desktop
+[post-build] webDist = c:\GIT\route_core\packages\web\dist
+[post-build] targetDir = c:\GIT\route_core\packages\desktop\build\dev-win-x64\RouteCore-dev\Resources\app\views\mainview
+[post-build] Copied index.html (480 -> 480 bytes)
+[post-build] Copied 2 asset(s): index-1NXbY4za.js, index-2ei4sbE3.css
+[post-build] Web app bundled into desktop build successfully.
+Packing resources into ASAR archive...
+Using zig-asar from: c:\GIT\route_core\node_modules\electrobun\dist-win-x64\zig-asar\x64\zig-asar.exe
+Packing c:\GIT\route_core\packages\desktop\build\dev-win-x64\RouteCore-dev\Resources\app -> c:\GIT\route_core\packages\desktop\build\dev-win-x64\RouteCore-dev\Resources\app.asar
+Unpack patterns: { *.node, *.dll, *.dylib, *.so, *.db }
+✓ Successfully created c:\GIT\route_core\packages\desktop\build\dev-win-x64\RouteCore-dev\Resources\app.asar
+✓ Created app.asar
+✓ Removed app/ folder (now in ASAR)
+skipping codesign
+skipping notarization
+Launcher starting on windows...
+Current directory: C:\GIT\route_core\packages\desktop\build\dev-win-x64\RouteCore-dev\bin
+Spawning: C:\GIT\route_core\packages\desktop\build\dev-win-x64\RouteCore-dev\bin\bun.exe C:\GIT\route_core\packages\desktop\build\dev-win-x64\RouteCore-dev\bin\..\Resources\main.js
+Dev build detected - console output enabled
+Attached to parent console
+Child process spawned with PID anyopaque@c8
+[LAUNCHER] Loaded identifier: dev.routecore.app, name: RouteCore-dev, channel: dev
+[LAUNCHER] Loading app code from ASAR: C:\GIT\route_core\packages\desktop\build\dev-win-x64\RouteCore-dev\Resources\app.asar
+[LAUNCHER] Using native wrapper's ASAR reader: C:\GIT\route_core\packages\desktop\build\dev-win-x64\RouteCore-dev\bin\libNativeWrapper.dll
+[LAUNCHER] Read 12476283 bytes from ASAR for bun/index.js
+[LAUNCHER] Wrote app entrypoint to: C:\Users\Riko\AppData\Local\Temp\electrobun-1774281840353-w9mvjno.js
+Server started at http://localhost:50000
+[Mon Mar 23 17:04:01 2026] setJSUtils called but using map-based approach instead of callbacks
+[LAUNCHER] Failed to delete temp file: ENOENT: no such file or directory, unlink 'C:UsersRikoAppDataLocalTempelectrobun-1774281840353-w9mvjno.js'
+[Route Core] Port 3001 in use, finding a free port...
+[Route Core] Embedded API server running on port 57852
+[Mon Mar 23 17:04:01 2026] Custom class failed, falling back to STATIC class
+[Route Core] Desktop application started
+WebView2: Download handler registered successfully
+[WebView2] NavigationStarting fired for webview 1
+[Mon Mar 23 17:04:02 2026] DEBUG loadViewsFile: Opened ASAR archive at C:\GIT\route_core\packages\desktop\build\dev-win-x64\RouteCore-dev\bin\..\Resources\app.asar
+[Mon Mar 23 17:04:02 2026] DEBUG loadViewsFile: Read 480 bytes from ASAR for mainview/index.html
+[Mon Mar 23 17:04:02 2026] DEBUG loadViewsFile: Read 193749 bytes from ASAR for mainview/assets/index-1NXbY4za.js
+[Mon Mar 23 17:04:02 2026] DEBUG loadViewsFile: Read 6566 bytes from ASAR for mainview/assets/index-2ei4sbE3.css
+[WebView2] NavigationCompleted fired for webview 1
+[Bridge:eventBridge] Unknown method DISPID=1 for webview 1
+[Bridge:eventBridge] Received message for webview 1
+[Mon Mar 23 17:04:02 2026] DEBUG loadViewsFile: File not found in ASAR: mainview/favicon.svg
+[Mon Mar 23 17:04:02 2026] DEBUG loadViewsFile: Attempting flat file read: C:\GIT\route_core\packages\desktop\build\dev-win-x64\RouteCore-dev\bin\..\Resources\app\views\mainview/favicon.svg
+[Mon Mar 23 17:04:02 2026] ERROR: Could not open views file: C:\GIT\route_core\packages\desktop\build\dev-win-x64\RouteCore-dev\bin\..\Resources\app\views\mainview/favicon.svg

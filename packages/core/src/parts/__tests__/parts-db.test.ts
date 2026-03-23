@@ -12,6 +12,7 @@ function makeComponent(id: string): Component {
     partNumber: `PN-${id}`,
     category: 'connector',
     type: 'free_hanging',
+    shape: 'rectangular',
     pins: [],
     footprint: { width: 20, height: 20, pinLayout: 'single_row' },
     description: '',

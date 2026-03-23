@@ -35,6 +35,10 @@ describe('createDefaultCanvas', () => {
       snapToGrid: true,
       showLabels: true,
       showPinNumbers: true,
+      showGrid: true,
+      showWireInfo: true,
+      wireUnits: 'awg',
+      lengthUnits: 'metric',
     });
   });
 

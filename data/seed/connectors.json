@@ -1,0 +1,215 @@
+[
+  {
+    "id": "jst-ph-2",
+    "name": "JST PH 2-Pin",
+    "manufacturer": "JST",
+    "partNumber": "B2B-PH-K-S",
+    "category": "connector",
+    "type": "pcb_mount",
+    "pins": [
+      { "id": "p1", "label": "1", "position": { "x": 0, "y": 5 }, "direction": "left", "signalType": "power", "gender": "male" },
+      { "id": "p2", "label": "2", "position": { "x": 0, "y": 15 }, "direction": "left", "signalType": "power", "gender": "male" }
+    ],
+    "footprint": { "width": 20, "height": 20, "pinLayout": "single_row" },
+    "description": "JST PH series 2-pin header, 2.0mm pitch",
+    "tags": ["jst", "ph", "2pin", "header", "2mm"],
+    "custom": false
+  },
+  {
+    "id": "jst-xh-4",
+    "name": "JST XH 4-Pin",
+    "manufacturer": "JST",
+    "partNumber": "B4B-XH-A",
+    "category": "connector",
+    "type": "pcb_mount",
+    "pins": [
+      { "id": "p1", "label": "1", "position": { "x": 0, "y": 5 }, "direction": "left", "signalType": "signal", "gender": "male" },
+      { "id": "p2", "label": "2", "position": { "x": 0, "y": 15 }, "direction": "left", "signalType": "signal", "gender": "male" },
+      { "id": "p3", "label": "3", "position": { "x": 0, "y": 25 }, "direction": "left", "signalType": "signal", "gender": "male" },
+      { "id": "p4", "label": "4", "position": { "x": 0, "y": 35 }, "direction": "left", "signalType": "signal", "gender": "male" }
+    ],
+    "footprint": { "width": 20, "height": 40, "pinLayout": "single_row" },
+    "description": "JST XH series 4-pin header, 2.5mm pitch",
+    "tags": ["jst", "xh", "4pin", "header", "2.5mm"],
+    "custom": false
+  },
+  {
+    "id": "molex-microfit-4",
+    "name": "Molex Micro-Fit 3.0 4-Pin",
+    "manufacturer": "Molex",
+    "partNumber": "43045-0412",
+    "category": "connector",
+    "type": "panel_mount",
+    "pins": [
+      { "id": "p1", "label": "1", "position": { "x": 0, "y": 5 }, "direction": "left", "signalType": "power", "currentRating": 5, "gender": "male" },
+      { "id": "p2", "label": "2", "position": { "x": 0, "y": 15 }, "direction": "left", "signalType": "power", "currentRating": 5, "gender": "male" },
+      { "id": "p3", "label": "3", "position": { "x": 20, "y": 5 }, "direction": "right", "signalType": "power", "currentRating": 5, "gender": "male" },
+      { "id": "p4", "label": "4", "position": { "x": 20, "y": 15 }, "direction": "right", "signalType": "power", "currentRating": 5, "gender": "male" }
+    ],
+    "footprint": { "width": 30, "height": 20, "pinLayout": "dual_row" },
+    "description": "Molex Micro-Fit 3.0 dual-row 4-pin connector, 3.0mm pitch, 5A per pin",
+    "tags": ["molex", "micro-fit", "4pin", "power", "3mm"],
+    "custom": false
+  },
+  {
+    "id": "db9-male",
+    "name": "DB9 Male",
+    "manufacturer": "TE Connectivity",
+    "partNumber": "5747840-4",
+    "category": "connector",
+    "type": "panel_mount",
+    "pins": [
+      { "id": "p1", "label": "1", "position": { "x": 2, "y": 5 }, "direction": "left", "signalType": "data", "gender": "male" },
+      { "id": "p2", "label": "2", "position": { "x": 2, "y": 15 }, "direction": "left", "signalType": "data", "gender": "male" },
+      { "id": "p3", "label": "3", "position": { "x": 2, "y": 25 }, "direction": "left", "signalType": "data", "gender": "male" },
+      { "id": "p4", "label": "4", "position": { "x": 2, "y": 35 }, "direction": "left", "signalType": "data", "gender": "male" },
+      { "id": "p5", "label": "5", "position": { "x": 2, "y": 45 }, "direction": "left", "signalType": "ground", "gender": "male" },
+      { "id": "p6", "label": "6", "position": { "x": 28, "y": 10 }, "direction": "right", "signalType": "data", "gender": "male" },
+      { "id": "p7", "label": "7", "position": { "x": 28, "y": 20 }, "direction": "right", "signalType": "data", "gender": "male" },
+      { "id": "p8", "label": "8", "position": { "x": 28, "y": 30 }, "direction": "right", "signalType": "data", "gender": "male" },
+      { "id": "p9", "label": "9", "position": { "x": 28, "y": 40 }, "direction": "right", "signalType": "data", "gender": "male" }
+    ],
+    "footprint": { "width": 30, "height": 50, "pinLayout": "dual_row" },
+    "description": "D-Sub 9-pin male connector",
+    "tags": ["db9", "dsub", "serial", "rs232", "9pin"],
+    "custom": false
+  },
+  {
+    "id": "terminal-block-4",
+    "name": "Terminal Block 4-Position",
+    "manufacturer": "Phoenix Contact",
+    "partNumber": "1935161",
+    "category": "terminal",
+    "type": "din_rail",
+    "pins": [
+      { "id": "p1", "label": "1", "position": { "x": 0, "y": 8 }, "direction": "left", "signalType": "power", "currentRating": 20, "gender": "neutral" },
+      { "id": "p2", "label": "2", "position": { "x": 0, "y": 18 }, "direction": "left", "signalType": "power", "currentRating": 20, "gender": "neutral" },
+      { "id": "p3", "label": "3", "position": { "x": 0, "y": 28 }, "direction": "left", "signalType": "power", "currentRating": 20, "gender": "neutral" },
+      { "id": "p4", "label": "4", "position": { "x": 0, "y": 38 }, "direction": "left", "signalType": "power", "currentRating": 20, "gender": "neutral" }
+    ],
+    "footprint": { "width": 25, "height": 45, "pinLayout": "single_row" },
+    "description": "Phoenix Contact COMBICON 4-position terminal block, 5.08mm pitch, 20A",
+    "tags": ["terminal", "block", "phoenix", "din", "screw"],
+    "custom": false
+  },
+  {
+    "id": "relay-spdt-5pin",
+    "name": "SPDT Relay 5-Pin",
+    "manufacturer": "Omron",
+    "partNumber": "G5V-1-DC5",
+    "category": "relay",
+    "type": "pcb_mount",
+    "pins": [
+      { "id": "coil1", "label": "COIL+", "position": { "x": 0, "y": 8 }, "direction": "left", "signalType": "power", "gender": "neutral" },
+      { "id": "coil2", "label": "COIL-", "position": { "x": 0, "y": 18 }, "direction": "left", "signalType": "ground", "gender": "neutral" },
+      { "id": "com", "label": "COM", "position": { "x": 30, "y": 8 }, "direction": "right", "signalType": "power", "currentRating": 10, "gender": "neutral" },
+      { "id": "no", "label": "NO", "position": { "x": 30, "y": 18 }, "direction": "right", "signalType": "power", "currentRating": 10, "gender": "neutral" },
+      { "id": "nc", "label": "NC", "position": { "x": 30, "y": 28 }, "direction": "right", "signalType": "power", "currentRating": 10, "gender": "neutral" }
+    ],
+    "footprint": { "width": 30, "height": 35, "pinLayout": "custom" },
+    "description": "Omron SPDT signal relay, 5V coil, 1A switching",
+    "tags": ["relay", "spdt", "omron", "signal"],
+    "custom": false
+  },
+  {
+    "id": "fuse-holder-inline",
+    "name": "Inline Fuse Holder",
+    "manufacturer": "Littelfuse",
+    "partNumber": "01000056Z",
+    "category": "fuse",
+    "type": "inline",
+    "pins": [
+      { "id": "in", "label": "IN", "position": { "x": 0, "y": 10 }, "direction": "left", "signalType": "power", "currentRating": 30, "gender": "neutral" },
+      { "id": "out", "label": "OUT", "position": { "x": 25, "y": 10 }, "direction": "right", "signalType": "power", "currentRating": 30, "gender": "neutral" }
+    ],
+    "footprint": { "width": 25, "height": 20, "pinLayout": "single_row" },
+    "description": "Inline blade fuse holder, accepts ATO/ATC fuses up to 30A",
+    "tags": ["fuse", "holder", "inline", "blade", "ato"],
+    "custom": false
+  },
+  {
+    "id": "m12-4pin",
+    "name": "M12 4-Pin Connector",
+    "manufacturer": "Tensility",
+    "partNumber": "CA-M12A4F",
+    "category": "connector",
+    "type": "panel_mount",
+    "pins": [
+      { "id": "p1", "label": "1", "position": { "x": 15, "y": 0 }, "direction": "top", "signalType": "signal", "currentRating": 4, "gender": "female" },
+      { "id": "p2", "label": "2", "position": { "x": 30, "y": 15 }, "direction": "right", "signalType": "signal", "currentRating": 4, "gender": "female" },
+      { "id": "p3", "label": "3", "position": { "x": 15, "y": 30 }, "direction": "bottom", "signalType": "signal", "currentRating": 4, "gender": "female" },
+      { "id": "p4", "label": "4", "position": { "x": 0, "y": 15 }, "direction": "left", "signalType": "signal", "currentRating": 4, "gender": "female" }
+    ],
+    "footprint": { "width": 30, "height": 30, "pinLayout": "circular" },
+    "description": "M12 4-pin A-coded circular connector, IP67, 4A per pin",
+    "tags": ["m12", "circular", "industrial", "ip67", "4pin"],
+    "custom": false
+  },
+  {
+    "id": "circuit-breaker-1p",
+    "name": "Circuit Breaker 1-Pole 10A",
+    "manufacturer": "Schneider Electric",
+    "partNumber": "A9F74110",
+    "category": "circuit_breaker",
+    "type": "din_rail",
+    "pins": [
+      { "id": "line", "label": "LINE", "position": { "x": 0, "y": 8 }, "direction": "left", "signalType": "power", "currentRating": 10, "gender": "neutral" },
+      { "id": "load", "label": "LOAD", "position": { "x": 20, "y": 8 }, "direction": "right", "signalType": "power", "currentRating": 10, "gender": "neutral" }
+    ],
+    "footprint": { "width": 20, "height": 16, "pinLayout": "single_row" },
+    "description": "Miniature circuit breaker, 1-pole, C-curve, 10A, 6kA",
+    "tags": ["breaker", "mcb", "1pole", "10a", "din"],
+    "custom": false
+  },
+  {
+    "id": "dc-motor-2pin",
+    "name": "DC Motor",
+    "manufacturer": "Generic",
+    "partNumber": "",
+    "category": "motor",
+    "type": "free_hanging",
+    "pins": [
+      { "id": "pos", "label": "+", "position": { "x": 0, "y": 8 }, "direction": "left", "signalType": "power", "currentRating": 5, "gender": "neutral" },
+      { "id": "neg", "label": "-", "position": { "x": 0, "y": 18 }, "direction": "left", "signalType": "ground", "currentRating": 5, "gender": "neutral" }
+    ],
+    "footprint": { "width": 20, "height": 26, "pinLayout": "single_row" },
+    "description": "Generic brushed DC motor, 2-wire connection",
+    "tags": ["motor", "dc", "brushed", "2pin"],
+    "custom": false
+  },
+  {
+    "id": "toggle-switch-spdt",
+    "name": "SPDT Toggle Switch",
+    "manufacturer": "Generic",
+    "partNumber": "",
+    "category": "switch",
+    "type": "panel_mount",
+    "pins": [
+      { "id": "com", "label": "COM", "position": { "x": 0, "y": 5 }, "direction": "left", "signalType": "power", "currentRating": 6, "gender": "neutral" },
+      { "id": "on1", "label": "ON1", "position": { "x": 0, "y": 15 }, "direction": "left", "signalType": "power", "currentRating": 6, "gender": "neutral" },
+      { "id": "on2", "label": "ON2", "position": { "x": 0, "y": 25 }, "direction": "left", "signalType": "power", "currentRating": 6, "gender": "neutral" }
+    ],
+    "footprint": { "width": 20, "height": 30, "pinLayout": "single_row" },
+    "description": "SPDT toggle switch, 6A 250VAC",
+    "tags": ["switch", "toggle", "spdt", "panel"],
+    "custom": false
+  },
+  {
+    "id": "psu-24v-din",
+    "name": "24V DIN Rail Power Supply",
+    "manufacturer": "Mean Well",
+    "partNumber": "HDR-30-24",
+    "category": "power_supply",
+    "type": "din_rail",
+    "pins": [
+      { "id": "ac_l", "label": "AC/L", "position": { "x": 0, "y": 8 }, "direction": "left", "signalType": "power", "voltageRating": 240, "gender": "neutral" },
+      { "id": "ac_n", "label": "AC/N", "position": { "x": 0, "y": 18 }, "direction": "left", "signalType": "power", "voltageRating": 240, "gender": "neutral" },
+      { "id": "dc_pos", "label": "+V", "position": { "x": 40, "y": 8 }, "direction": "right", "signalType": "power", "voltageRating": 24, "currentRating": 1.5, "gender": "neutral" },
+      { "id": "dc_neg", "label": "-V", "position": { "x": 40, "y": 18 }, "direction": "right", "signalType": "ground", "voltageRating": 24, "gender": "neutral" }
+    ],
+    "footprint": { "width": 40, "height": 26, "pinLayout": "custom" },
+    "description": "Mean Well HDR-30-24, 24VDC 1.5A DIN rail power supply",
+    "tags": ["psu", "power", "supply", "24v", "din", "meanwell"],
+    "custom": false
+  }
+]

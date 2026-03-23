@@ -10,8 +10,16 @@
     "dev": "npm run dev --workspace=packages/web",
     "dev:server": "npm run dev --workspace=packages/server",
     "build": "npm run build --workspaces",
+    "build:core": "npm run build --workspace=packages/core",
+    "build:server": "npm run build --workspace=packages/server",
+    "build:web": "npm run build --workspace=packages/web",
     "test": "npm run test --workspaces --if-present",
-    "lint": "eslint packages/*/src --ext .ts,.tsx"
+    "test:core": "npm run test --workspace=packages/core",
+    "test:server": "npm run test --workspace=packages/server",
+    "test:coverage": "npm run test:coverage --workspaces --if-present",
+    "lint": "eslint packages/*/src --ext .ts,.tsx",
+    "clean": "rimraf packages/*/dist packages/*/coverage",
+    "typecheck": "tsc --noEmit -p packages/core/tsconfig.json && tsc --noEmit -p packages/server/tsconfig.json"
   },
   "devDependencies": {
     "typescript": "^5.4.0",

@@ -1,0 +1,155 @@
+stages:
+  - lint
+  - test
+  - property
+  - stress
+  - benchmark
+  - crdt
+
+variables:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: "1"
+
+# ── Templates ─────────────────────────────────────────────────────────────────
+
+.rust-cache:
+  cache:
+    key: "${CI_JOB_NAME}-${CI_COMMIT_REF_SLUG}"
+    paths:
+      - testing-framework/target/
+      - ${CARGO_HOME}/registry/
+      - ${CARGO_HOME}/git/
+    policy: pull-push
+
+.rust-base:
+  extends: .rust-cache
+  image: rust:1.75
+  before_script:
+    - cd testing-framework
+
+# ── Lint ──────────────────────────────────────────────────────────────────────
+
+lint:format:
+  extends: .rust-base
+  stage: lint
+  script:
+    - rustup component add rustfmt
+    - cargo fmt --all -- --check
+
+lint:clippy:
+  extends: .rust-base
+  stage: lint
+  script:
+    - rustup component add clippy
+    - cargo clippy --workspace --all-targets -- -D warnings
+
+# ── Unit & Integration Tests ─────────────────────────────────────────────────
+
+test:linux:
+  extends: .rust-base
+  stage: test
+  script:
+    - cargo test --workspace --verbose
+  artifacts:
+    when: always
+    paths:
+      - testing-framework/test-output/
+    expire_in: 14 days
+    reports:
+      junit: testing-framework/test-output/results.xml
+
+test:release:
+  extends: .rust-base
+  stage: test
+  script:
+    - cargo test --workspace --release
+
+# ── Property-Based Tests (sharded) ──────────────────────────────────────────
+
+.property-shard:
+  extends: .rust-base
+  stage: property
+  script:
+    - cargo build --release -p industrial-test-cli
+    - ./target/release/industrial-test property
+        --cases 250
+        --seed ${SHARD_SEED}
+        --max-nodes 30
+        --max-edges 60
+        -o ./test-output
+  artifacts:
+    when: always
+    paths:
+      - testing-framework/test-output/
+    expire_in: 14 days
+
+property:shard-0:
+  extends: .property-shard
+  variables:
+    SHARD_SEED: "0"
+
+property:shard-1:
+  extends: .property-shard
+  variables:
+    SHARD_SEED: "100"
+
+property:shard-2:
+  extends: .property-shard
+  variables:
+    SHARD_SEED: "200"
+
+property:shard-3:
+  extends: .property-shard
+  variables:
+    SHARD_SEED: "300"
+
+# ── Stress Tests ─────────────────────────────────────────────────────────────
+
+stress:small:
+  extends: .rust-base
+  stage: stress
+  script:
+    - cargo build --release -p industrial-test-cli
+    - ./target/release/industrial-test stress --nodes 1000 --edges 3000 --timeout 60
+
+stress:medium:
+  extends: .rust-base
+  stage: stress
+  script:
+    - cargo build --release -p industrial-test-cli
+    - ./target/release/industrial-test stress --nodes 10000 --edges 30000 --timeout 120
+
+stress:large:
+  extends: .rust-base
+  stage: stress
+  tags:
+    - high-memory
+  script:
+    - cargo build --release -p industrial-test-cli
+    - ./target/release/industrial-test stress --nodes 50000 --edges 100000 --timeout 300
+
+# ── Benchmarks ───────────────────────────────────────────────────────────────
+
+benchmark:
+  extends: .rust-base
+  stage: benchmark
+  script:
+    - cargo bench --bench model_bench -- --output-format bencher 2>&1 | tee benchmark-results.txt
+    - cargo build --release -p industrial-test-cli
+    - ./target/release/industrial-test bench --iterations 200 --csv -o ./test-output
+  artifacts:
+    when: always
+    paths:
+      - testing-framework/benchmark-results.txt
+      - testing-framework/test-output/benchmarks.csv
+    expire_in: 30 days
+
+# ── CRDT Convergence ─────────────────────────────────────────────────────────
+
+crdt:convergence:
+  extends: .rust-base
+  stage: crdt
+  script:
+    - cargo build --release -p industrial-test-cli
+    - ./target/release/industrial-test crdt --clients 5 --ops 50
+    - ./target/release/industrial-test crdt --clients 5 --ops 50 --partitions

@@ -1,4 +1,4 @@
-//! Industrial Test Core — Production-grade testing framework for professional GUI applications.
+//! Anvil Core — Production-grade testing framework for professional GUI applications.
 //!
 //! # Architecture
 //!

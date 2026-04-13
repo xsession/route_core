@@ -1,5 +1,5 @@
 [package]
-name = "industrial-test-core"
+name = "anvil-core"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

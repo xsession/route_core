@@ -22,17 +22,17 @@ CLI
 .. code-block:: bash
 
    # Generate and validate 50 component trees
-   industrial-test web --trees 50 --depth 4 --seed 42
+   anvil web --trees 50 --depth 4 --seed 42
 
    # Specify form complexity
-   industrial-test web --trees 20 --form-fields 8 --max-children 6
+   anvil web --trees 20 --form-fields 8 --max-children 6
 
 Rust API
 ^^^^^^^^
 
 .. code-block:: rust
 
-   use industrial_test_core::web::*;
+   use anvil_core::web::*;
 
    let tree = ComponentTree::generate(42, GenerateConfig {
        max_depth: 5,
@@ -120,7 +120,7 @@ Integrating with CI
    # GitHub Actions example
    - name: Web GUI tests
      run: |
-       industrial-test web --trees 100 --depth 5 --seed ${{ github.run_id }}
-       industrial-test report test-output/web-results.json --format junit
+       anvil web --trees 100 --depth 5 --seed ${{ github.run_id }}
+       anvil report test-output/web-results.json --format junit
 
 Seed any test with the CI run ID for deterministic, reproducible failures.

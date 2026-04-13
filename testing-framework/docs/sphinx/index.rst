@@ -1,6 +1,6 @@
-.. Industrial Test Framework documentation master file.
+.. Anvil Test Framework documentation master file.
 
-Industrial Test Framework
+Anvil Test Framework
 =========================
 
 **Production-grade, universal testing framework for professional GUI applications.**

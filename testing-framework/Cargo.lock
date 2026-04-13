@@ -77,6 +77,48 @@ dependencies = [
 ]
 
 [[package]]
+name = "anvil-cli"
+version = "0.1.0"
+dependencies = [
+ "anvil-core",
+ "chrono",
+ "clap",
+ "rayon",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+ "uuid",
+]
+
+[[package]]
+name = "anvil-core"
+version = "0.1.0"
+dependencies = [
+ "bincode",
+ "chrono",
+ "criterion",
+ "csv",
+ "hex",
+ "proptest",
+ "quickcheck",
+ "quickcheck_macros",
+ "rand 0.8.5",
+ "rand_chacha 0.3.1",
+ "rayon",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tempfile",
+ "thiserror",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+ "uuid",
+]
+
+[[package]]
 name = "anyhow"
 version = "1.0.102"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -568,48 +610,6 @@ dependencies = [
  "hashbrown 0.17.0",
  "serde",
  "serde_core",
-]
-
-[[package]]
-name = "industrial-test-cli"
-version = "0.1.0"
-dependencies = [
- "chrono",
- "clap",
- "industrial-test-core",
- "rayon",
- "serde",
- "serde_json",
- "tokio",
- "tracing",
- "tracing-subscriber",
- "uuid",
-]
-
-[[package]]
-name = "industrial-test-core"
-version = "0.1.0"
-dependencies = [
- "bincode",
- "chrono",
- "criterion",
- "csv",
- "hex",
- "proptest",
- "quickcheck",
- "quickcheck_macros",
- "rand 0.8.5",
- "rand_chacha 0.3.1",
- "rayon",
- "serde",
- "serde_json",
- "sha2",
- "tempfile",
- "thiserror",
- "tokio",
- "tracing",
- "tracing-subscriber",
- "uuid",
 ]
 
 [[package]]

@@ -13,10 +13,10 @@ from .runner import TestOrchestrator, RunConfig, ResultsAggregator
 @click.group()
 @click.option("--verbose", "-v", is_flag=True, help="Enable verbose output")
 @click.option("--output", "-o", default="./test-output", help="Output directory")
-@click.option("--binary", default="industrial-test", help="Path to Rust binary")
+@click.option("--binary", default="anvil", help="Path to Rust binary")
 @click.pass_context
 def main(ctx, verbose: bool, output: str, binary: str):
-    """Industrial Test Orchestrator — coordinate test runs across CI."""
+    """Anvil Orchestrator — coordinate test runs across CI."""
     ctx.ensure_object(dict)
     ctx.obj["config"] = RunConfig(
         rust_binary=binary,

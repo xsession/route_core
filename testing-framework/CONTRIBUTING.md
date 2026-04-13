@@ -1,4 +1,4 @@
-# Contributing to Industrial Test Framework
+# Contributing to Anvil Test Framework
 
 Thank you for your interest in contributing!
 
@@ -15,16 +15,16 @@ Thank you for your interest in contributing!
 cargo test --workspace
 
 # Run only unit tests
-cargo test -p industrial-test-core
+cargo test -p anvil-core
 
 # Run integration tests
-cargo test -p industrial-test-core --test integration_tests
+cargo test -p anvil-core --test integration_tests
 
 # Run framework self-tests
-cargo test -p industrial-test-core --test framework_self_tests
+cargo test -p anvil-core --test framework_self_tests
 
 # Run benchmarks
-cargo bench -p industrial-test-core
+cargo bench -p anvil-core
 
 # Check formatting
 cargo fmt --check

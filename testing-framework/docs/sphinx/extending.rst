@@ -12,7 +12,7 @@ Add domain-specific invariants to the graph model:
 
 .. code-block:: rust
 
-   use industrial_test_core::model::{Graph, Node};
+   use anvil_core::model::{Graph, Node};
 
    fn no_self_loops(graph: &Graph) -> Result<(), String> {
        for edge in graph.edges() {
@@ -51,7 +51,7 @@ Create domain-specific test cases by implementing the test-case closure:
 
 .. code-block:: rust
 
-   use industrial_test_core::runner::{TestCase, TestSuite};
+   use anvil_core::runner::{TestCase, TestSuite};
 
    let case = TestCase::new("cable_harness_connectivity", |_ctx| {
        // Build a harness-specific graph
@@ -70,7 +70,7 @@ Implement ``Arbitrary`` for your domain types to use them in generative tests:
 
 .. code-block:: rust
 
-   use industrial_test_core::generators::Arbitrary;
+   use anvil_core::generators::Arbitrary;
 
    struct WireSpec {
        gauge: u8,
@@ -103,13 +103,13 @@ Use the Python orchestration layer for complex multi-stage workflows:
 
 .. code-block:: python
 
-   from industrial_test import TestOrchestrator, Pipeline
+   from anvil_test import TestOrchestrator, Pipeline
 
    pipeline = Pipeline("nightly")
    pipeline.add_stage("unit", "cargo test --workspace")
-   pipeline.add_stage("property", "industrial-test property --cases 10000")
-   pipeline.add_stage("stress", "industrial-test stress --nodes 50000")
-   pipeline.add_stage("web", "industrial-test web --trees 200 --depth 6")
+   pipeline.add_stage("property", "anvil property --cases 10000")
+   pipeline.add_stage("stress", "anvil stress --nodes 50000")
+   pipeline.add_stage("web", "anvil web --trees 200 --depth 6")
 
    orchestrator = TestOrchestrator()
    results = orchestrator.run(pipeline, parallel_stages=False)
@@ -123,7 +123,7 @@ To validate layouts from a custom renderer, convert your output to
 
 .. code-block:: rust
 
-   use industrial_test_core::render::{RenderTree, RenderNode, BoundingBox};
+   use anvil_core::render::{RenderTree, RenderNode, BoundingBox};
 
    fn from_my_renderer(output: &MyRenderOutput) -> RenderTree {
        let nodes = output.elements.iter().map(|el| {

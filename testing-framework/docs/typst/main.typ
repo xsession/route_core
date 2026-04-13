@@ -1,9 +1,9 @@
-// Industrial Test Framework — Technical Reference Manual
+// Anvil Test Framework — Technical Reference Manual
 // Typst document — compile with: typst compile main.typ
 
 #set document(
-  title: "Industrial Test Framework — Technical Reference",
-  author: "Industrial Test Framework Contributors",
+  title: "Anvil Test Framework — Technical Reference",
+  author: "Anvil Test Framework Contributors",
   date: auto,
 )
 
@@ -13,7 +13,7 @@
   header: context {
     if counter(page).get().first() > 1 [
       #set text(8pt, fill: luma(120))
-      Industrial Test Framework
+      Anvil Test Framework
       #h(1fr)
       Technical Reference v0.1.0
     ]
@@ -61,7 +61,7 @@
 
 #align(center)[
   #v(4cm)
-  #text(28pt, weight: "bold")[Industrial Test Framework]
+  #text(28pt, weight: "bold")[Anvil Test Framework]
   #v(0.5cm)
   #text(14pt, fill: luma(80))[Technical Reference Manual]
   #v(0.3cm)
@@ -88,7 +88,7 @@
 = Introduction
 // ═══════════════════════════════════════════════════════════
 
-The *Industrial Test Framework* is a Rust-native testing toolkit designed to
+The *Anvil Test Framework* is a Rust-native testing toolkit designed to
 validate complex, stateful GUI applications at scale. It provides:
 
 - *Graph-based model layer* with custom invariants
@@ -110,8 +110,8 @@ validate complex, stateful GUI applications at scale. It provides:
 == Installation
 
 ```bash
-cargo add industrial-test-core
-cargo install industrial-test-cli
+cargo add anvil-core
+cargo install anvil-cli
 ```
 
 // ═══════════════════════════════════════════════════════════
@@ -126,8 +126,8 @@ The framework is organized as a Cargo workspace:
   stroke: 0.5pt + luma(200),
   inset: 8pt,
   [*Crate*], [*Purpose*],
-  [`industrial-test-core`], [Library: all modules, types, validators],
-  [`industrial-test-cli`], [Binary: CLI runner with 8 subcommands],
+  [`anvil-core`], [Library: all modules, types, validators],
+  [`anvil-cli`], [Binary: CLI runner with 8 subcommands],
 )
 
 == Layer Diagram
@@ -500,8 +500,8 @@ test:
 Use CI run IDs as seeds for unique-yet-reproducible coverage:
 
 ```bash
-industrial-test property --seed $GITHUB_RUN_ID
-industrial-test property --seed $CI_PIPELINE_ID
+anvil property --seed $GITHUB_RUN_ID
+anvil property --seed $CI_PIPELINE_ID
 ```
 
 // ═══════════════════════════════════════════════════════════

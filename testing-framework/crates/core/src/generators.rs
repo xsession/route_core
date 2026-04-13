@@ -6,7 +6,7 @@
 //!
 //! # Example
 //! ```ignore
-//! use industrial_test_core::generators::*;
+//! use anvil_core::generators::*;
 //!
 //! let mut gen = Gen::new(42);
 //! let s: String = gen.arbitrary::<String>();

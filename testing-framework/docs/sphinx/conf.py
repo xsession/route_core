@@ -1,4 +1,4 @@
-# -- Industrial Test Framework — Sphinx Configuration --
+# -- Anvil Test Framework — Sphinx Configuration --
 # Enterprise-grade documentation for the universal GUI testing framework.
 
 import os
@@ -7,9 +7,9 @@ from datetime import date
 
 # -- Project information -------------------------------------------------------
 
-project = "Industrial Test Framework"
-copyright = f"{date.today().year}, Industrial Test Framework Contributors"
-author = "Industrial Test Framework Contributors"
+project = "Anvil Test Framework"
+copyright = f"{date.today().year}, Anvil Test Framework Contributors"
+author = "Anvil Test Framework Contributors"
 version = "0.1.0"
 release = "0.1.0"
 
@@ -56,7 +56,7 @@ html_theme_options = {
 html_context = {
     "display_github": True,
     "github_user": "your-org",
-    "github_repo": "industrial-test-framework",
+    "github_repo": "anvil-test-framework",
     "github_version": "main",
     "conf_py_path": "/docs/sphinx/",
 }
@@ -72,8 +72,8 @@ latex_elements = {
 latex_documents = [
     (
         master_doc,
-        "IndustrialTestFramework.tex",
-        "Industrial Test Framework Documentation",
+        "AnvilTestFramework.tex",
+        "Anvil Test Framework Documentation",
         author,
         "manual",
     ),

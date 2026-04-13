@@ -10,7 +10,7 @@ Synopsis
 
 .. code-block:: text
 
-   industrial-test [OPTIONS] <COMMAND>
+   anvil [OPTIONS] <COMMAND>
 
 Global Options
 --------------
@@ -31,7 +31,7 @@ Commands
 
 .. code-block:: bash
 
-   industrial-test run [OPTIONS]
+   anvil run [OPTIONS]
 
 .. option:: -f, --filter <PATTERN>
 
@@ -58,7 +58,7 @@ Commands
 
 .. code-block:: bash
 
-   industrial-test stress [OPTIONS]
+   anvil stress [OPTIONS]
 
 .. option:: -n, --nodes <N>
 
@@ -81,7 +81,7 @@ Commands
 
 .. code-block:: bash
 
-   industrial-test bench [OPTIONS]
+   anvil bench [OPTIONS]
 
 .. option:: -i, --iterations <N>
 
@@ -96,7 +96,7 @@ Commands
 
 .. code-block:: bash
 
-   industrial-test replay <PATH> [OPTIONS]
+   anvil replay <PATH> [OPTIONS]
 
 .. option:: --verify
 
@@ -111,7 +111,7 @@ Commands
 
 .. code-block:: bash
 
-   industrial-test report <PATH> --format <junit|csv|json>
+   anvil report <PATH> --format <junit|csv|json>
 
 Reads a JSON results file and converts it to the specified format.
 
@@ -120,7 +120,7 @@ Reads a JSON results file and converts it to the specified format.
 
 .. code-block:: bash
 
-   industrial-test property [OPTIONS]
+   anvil property [OPTIONS]
 
 .. option:: -p, --cases <N>
 
@@ -147,7 +147,7 @@ Reads a JSON results file and converts it to the specified format.
 
 .. code-block:: bash
 
-   industrial-test crdt [OPTIONS]
+   anvil crdt [OPTIONS]
 
 .. option:: -c, --clients <N>
 
@@ -170,7 +170,7 @@ Reads a JSON results file and converts it to the specified format.
 
 .. code-block:: bash
 
-   industrial-test web [OPTIONS]
+   anvil web [OPTIONS]
 
 .. option:: -t, --trees <N>
 

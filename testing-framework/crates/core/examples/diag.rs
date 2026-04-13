@@ -1,4 +1,4 @@
-use industrial_test_core::*;
+use anvil_core::*;
 
 fn main() {
     // Test idempotency after first round-trip

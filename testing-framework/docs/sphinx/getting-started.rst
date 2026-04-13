@@ -21,8 +21,8 @@ Clone and build:
 
 .. code-block:: bash
 
-   git clone https://github.com/your-org/industrial-test-framework.git
-   cd industrial-test-framework
+   git clone https://github.com/your-org/anvil-test-framework.git
+   cd anvil-test-framework
    cargo build --workspace
 
 Run the full test suite:
@@ -38,7 +38,7 @@ Create a test that validates a graph model:
 
 .. code-block:: rust
 
-   use industrial_test_core::*;
+   use anvil_core::*;
 
    fn main() {
        // 1. Build a model
@@ -69,7 +69,7 @@ Generate and validate web component trees:
 
 .. code-block:: rust
 
-   use industrial_test_core::*;
+   use anvil_core::*;
 
    fn main() {
        // Generate a random form with 5 fields
@@ -96,7 +96,7 @@ Use the generic generator engine for any type:
 
 .. code-block:: rust
 
-   use industrial_test_core::generators::*;
+   use anvil_core::generators::*;
 
    fn main() {
        let config = GenPropertyConfig {

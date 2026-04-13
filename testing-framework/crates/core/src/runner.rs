@@ -331,7 +331,7 @@ impl RunReport {
         let mut xml = String::new();
         xml.push_str("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
         xml.push_str(&format!(
-            "<testsuite name=\"industrial-test\" tests=\"{}\" failures=\"{}\" time=\"{:.3}\">\n",
+            "<testsuite name=\"anvil\" tests=\"{}\" failures=\"{}\" time=\"{:.3}\">\n",
             self.results.len(),
             self.failed,
             self.total_duration.as_secs_f64()

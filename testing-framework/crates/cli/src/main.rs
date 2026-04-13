@@ -1,20 +1,20 @@
-//! CLI test runner — `industrial-test` command-line tool.
+//! CLI test runner — `anvil` command-line tool.
 //!
 //! Usage:
-//!   industrial-test run [--filter <pattern>] [--tag <tag>] [--parallel] [--seed <n>]
-//!   industrial-test stress [--nodes <n>] [--edges <n>] [--seed <n>]
-//!   industrial-test bench [--iterations <n>]
-//!   industrial-test replay <event-log.json>
-//!   industrial-test report <results.json> --format <junit|csv|json>
-//!   industrial-test web [--trees <n>] [--depth <n>] [--seed <n>]
+//!   anvil run [--filter <pattern>] [--tag <tag>] [--parallel] [--seed <n>]
+//!   anvil stress [--nodes <n>] [--edges <n>] [--seed <n>]
+//!   anvil bench [--iterations <n>]
+//!   anvil replay <event-log.json>
+//!   anvil report <results.json> --format <junit|csv|json>
+//!   anvil web [--trees <n>] [--depth <n>] [--seed <n>]
 
 use clap::{Parser, Subcommand};
-use industrial_test_core::*;
+use anvil_core::*;
 use std::path::PathBuf;
 use std::time::Duration;
 
 #[derive(Parser)]
-#[command(name = "industrial-test")]
+#[command(name = "anvil")]
 #[command(about = "Production-grade testing framework for industrial & web GUI applications")]
 #[command(version)]
 struct Cli {
@@ -256,7 +256,7 @@ fn cmd_run(
     format: String,
     output: &PathBuf,
 ) -> i32 {
-    println!("=== Industrial Test Runner ===\n");
+    println!("=== Anvil Test Runner ===\n");
 
     // Build built-in test suites
     let suites = build_example_suites();

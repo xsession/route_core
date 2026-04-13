@@ -1,6 +1,6 @@
 //! Integration tests — full cross-layer validation.
 
-use industrial_test_core::*;
+use anvil_core::*;
 
 #[test]
 fn end_to_end_model_event_serialize() {

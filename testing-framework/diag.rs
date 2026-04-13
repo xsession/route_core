@@ -1,4 +1,4 @@
-﻿use industrial_test_core::*;
+use anvil_core::*;
 fn main() {
     let config = property::PropertyTestConfig {
         seed: 0, num_cases: 50, max_nodes: 15, max_edges: 30, max_shrinks: 0,

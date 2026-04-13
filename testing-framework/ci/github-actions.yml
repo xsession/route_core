@@ -1,4 +1,4 @@
-name: Industrial Test Framework CI
+name: Anvil Test Framework CI
 
 on:
   push:
@@ -77,11 +77,11 @@ jobs:
           key: ${{ runner.os }}-cargo-prop-${{ hashFiles('testing-framework/Cargo.lock') }}
 
       - name: Build CLI
-        run: cargo build --release -p industrial-test-cli
+        run: cargo build --release -p anvil-cli
 
       - name: Run property tests (shard ${{ matrix.shard }})
         run: |
-          ./target/release/industrial-test property \
+          ./target/release/anvil property \
             --cases 250 \
             --seed ${{ matrix.shard }}00 \
             --max-nodes 30 \
@@ -119,16 +119,16 @@ jobs:
           key: ${{ runner.os }}-cargo-stress-${{ hashFiles('testing-framework/Cargo.lock') }}
 
       - name: Build CLI
-        run: cargo build --release -p industrial-test-cli
+        run: cargo build --release -p anvil-cli
 
       - name: Stress test (1K nodes)
-        run: ./target/release/industrial-test stress --nodes 1000 --edges 3000 --timeout 60
+        run: ./target/release/anvil stress --nodes 1000 --edges 3000 --timeout 60
 
       - name: Stress test (10K nodes)
-        run: ./target/release/industrial-test stress --nodes 10000 --edges 30000 --timeout 120
+        run: ./target/release/anvil stress --nodes 10000 --edges 30000 --timeout 120
 
       - name: Stress test (50K nodes)
-        run: ./target/release/industrial-test stress --nodes 50000 --edges 100000 --timeout 300
+        run: ./target/release/anvil stress --nodes 50000 --edges 100000 --timeout 300
 
   # ── Benchmarks ────────────────────────────────────────────────────────
   benchmarks:
@@ -157,8 +157,8 @@ jobs:
 
       - name: Run CLI benchmarks
         run: |
-          cargo build --release -p industrial-test-cli
-          ./target/release/industrial-test bench --iterations 200 --csv -o ./test-output
+          cargo build --release -p anvil-cli
+          ./target/release/anvil bench --iterations 200 --csv -o ./test-output
 
       - name: Upload benchmark results
         uses: actions/upload-artifact@v4
@@ -192,13 +192,13 @@ jobs:
           key: ${{ runner.os }}-cargo-crdt-${{ hashFiles('testing-framework/Cargo.lock') }}
 
       - name: Build CLI
-        run: cargo build --release -p industrial-test-cli
+        run: cargo build --release -p anvil-cli
 
       - name: CRDT test (no partitions)
-        run: ./target/release/industrial-test crdt --clients 5 --ops 50
+        run: ./target/release/anvil crdt --clients 5 --ops 50
 
       - name: CRDT test (with partitions)
-        run: ./target/release/industrial-test crdt --clients 5 --ops 50 --partitions
+        run: ./target/release/anvil crdt --clients 5 --ops 50 --partitions
 
   # ── Python Orchestrator Tests ─────────────────────────────────────────
   python-tests:

@@ -1,12 +1,12 @@
 [package]
-name = "industrial-test-cli"
+name = "anvil-cli"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 description = "CLI test runner for industrial & web GUI testing framework"
 
 [dependencies]
-industrial-test-core = { path = "../core" }
+anvil-core = { path = "../core" }
 clap.workspace = true
 serde.workspace = true
 serde_json.workspace = true

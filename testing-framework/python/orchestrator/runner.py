@@ -24,7 +24,7 @@ class ShardConfig:
 @dataclass
 class RunConfig:
     """Configuration for a test orchestration run."""
-    rust_binary: str = "industrial-test"
+    rust_binary: str = "anvil"
     output_dir: Path = field(default_factory=lambda: Path("./test-output"))
     verbose: bool = False
     parallel: bool = True
@@ -38,7 +38,7 @@ class RunConfig:
     def from_env(cls) -> "RunConfig":
         """Create config from environment variables (CI-friendly)."""
         return cls(
-            rust_binary=os.environ.get("INDUSTRIAL_TEST_BIN", "industrial-test"),
+            rust_binary=os.environ.get("ANVIL_BIN", "anvil"),
             output_dir=Path(os.environ.get("TEST_OUTPUT_DIR", "./test-output")),
             verbose=os.environ.get("VERBOSE", "").lower() in ("1", "true"),
             parallel=os.environ.get("SEQUENTIAL", "").lower() not in ("1", "true"),

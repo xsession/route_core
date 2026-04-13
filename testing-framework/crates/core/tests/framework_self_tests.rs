@@ -3,7 +3,7 @@
 //! These tests exercise edge cases, error paths, and invariants of the framework
 //! components: runner, generators, validators, and cross-module interactions.
 
-use industrial_test_core::*;
+use anvil_core::*;
 use std::time::Duration;
 
 // ═══════════════════════════════════════════════════════════════════════════════

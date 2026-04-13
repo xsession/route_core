@@ -97,10 +97,10 @@ Use the CI run ID or commit SHA as a seed:
 .. code-block:: bash
 
    # GitHub Actions
-   industrial-test property --seed ${{ github.run_id }}
+   anvil property --seed ${{ github.run_id }}
 
    # GitLab CI
-   industrial-test property --seed $CI_PIPELINE_ID
+   anvil property --seed $CI_PIPELINE_ID
 
 This gives unique coverage per run while remaining fully reproducible.
 
@@ -111,7 +111,7 @@ Generate JUnit XML for CI dashboards:
 
 .. code-block:: bash
 
-   industrial-test run --format junit
+   anvil run --format junit
    # → test-output/results.xml
 
 This integrates with GitHub Actions test summaries, GitLab merge-request
@@ -124,7 +124,7 @@ Export benchmarks as CSV and compare against a baseline:
 
 .. code-block:: bash
 
-   industrial-test bench --csv
+   anvil bench --csv
    # → test-output/benchmarks.csv
 
 Track the CSV in version control or a metrics service to detect regressions.

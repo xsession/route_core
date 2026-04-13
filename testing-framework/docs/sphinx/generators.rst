@@ -110,7 +110,7 @@ failure:
 
 .. code-block:: bash
 
-   industrial-test property --seed 12345 --cases 1
+   anvil property --seed 12345 --cases 1
 
 Shrinking in Depth
 ------------------

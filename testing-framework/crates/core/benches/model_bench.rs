@@ -1,8 +1,8 @@
 //! Criterion benchmarks for the core model.
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId};
-use industrial_test_core::*;
-use industrial_test_core::property::ArbitraryGraph;
+use anvil_core::*;
+use anvil_core::property::ArbitraryGraph;
 
 fn bench_graph_creation(c: &mut Criterion) {
     let mut group = c.benchmark_group("graph_creation");

@@ -70,8 +70,8 @@ test:release:
   extends: .rust-base
   stage: property
   script:
-    - cargo build --release -p industrial-test-cli
-    - ./target/release/industrial-test property
+    - cargo build --release -p anvil-cli
+    - ./target/release/anvil property
         --cases 250
         --seed ${SHARD_SEED}
         --max-nodes 30
@@ -109,15 +109,15 @@ stress:small:
   extends: .rust-base
   stage: stress
   script:
-    - cargo build --release -p industrial-test-cli
-    - ./target/release/industrial-test stress --nodes 1000 --edges 3000 --timeout 60
+    - cargo build --release -p anvil-cli
+    - ./target/release/anvil stress --nodes 1000 --edges 3000 --timeout 60
 
 stress:medium:
   extends: .rust-base
   stage: stress
   script:
-    - cargo build --release -p industrial-test-cli
-    - ./target/release/industrial-test stress --nodes 10000 --edges 30000 --timeout 120
+    - cargo build --release -p anvil-cli
+    - ./target/release/anvil stress --nodes 10000 --edges 30000 --timeout 120
 
 stress:large:
   extends: .rust-base
@@ -125,8 +125,8 @@ stress:large:
   tags:
     - high-memory
   script:
-    - cargo build --release -p industrial-test-cli
-    - ./target/release/industrial-test stress --nodes 50000 --edges 100000 --timeout 300
+    - cargo build --release -p anvil-cli
+    - ./target/release/anvil stress --nodes 50000 --edges 100000 --timeout 300
 
 # ── Benchmarks ───────────────────────────────────────────────────────────────
 
@@ -135,8 +135,8 @@ benchmark:
   stage: benchmark
   script:
     - cargo bench --bench model_bench -- --output-format bencher 2>&1 | tee benchmark-results.txt
-    - cargo build --release -p industrial-test-cli
-    - ./target/release/industrial-test bench --iterations 200 --csv -o ./test-output
+    - cargo build --release -p anvil-cli
+    - ./target/release/anvil bench --iterations 200 --csv -o ./test-output
   artifacts:
     when: always
     paths:
@@ -150,6 +150,6 @@ crdt:convergence:
   extends: .rust-base
   stage: crdt
   script:
-    - cargo build --release -p industrial-test-cli
-    - ./target/release/industrial-test crdt --clients 5 --ops 50
-    - ./target/release/industrial-test crdt --clients 5 --ops 50 --partitions
+    - cargo build --release -p anvil-cli
+    - ./target/release/anvil crdt --clients 5 --ops 50
+    - ./target/release/anvil crdt --clients 5 --ops 50 --partitions

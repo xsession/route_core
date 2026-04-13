@@ -1,4 +1,4 @@
-# Industrial Test Framework — Architecture
+# Anvil Test Framework — Architecture
 
 ## Overview
 
@@ -175,13 +175,13 @@ General-purpose test execution framework.
 ## CLI Commands
 
 ```
-industrial-test run    [--filter <pat>] [--tag <tag>] [--sequential] [--seed <n>] [--format json|text|junit]
-industrial-test stress [--nodes <n>] [--edges <n>] [--seed <n>] [--timeout <s>]
-industrial-test bench  [--iterations <n>] [--csv]
-industrial-test replay <event-log.json> [--verify] [--to-index <n>]
-industrial-test report <results.json> --format <junit|csv|json>
-industrial-test property [--cases <n>] [--max-nodes <n>] [--seed <n>] [--max-shrinks <n>]
-industrial-test crdt   [--clients <n>] [--ops <n>] [--seed <n>] [--partitions]
+anvil run    [--filter <pat>] [--tag <tag>] [--sequential] [--seed <n>] [--format json|text|junit]
+anvil stress [--nodes <n>] [--edges <n>] [--seed <n>] [--timeout <s>]
+anvil bench  [--iterations <n>] [--csv]
+anvil replay <event-log.json> [--verify] [--to-index <n>]
+anvil report <results.json> --format <junit|csv|json>
+anvil property [--cases <n>] [--max-nodes <n>] [--seed <n>] [--max-shrinks <n>]
+anvil crdt   [--clients <n>] [--ops <n>] [--seed <n>] [--partitions]
 ```
 
 ## Deterministic Seeding
@@ -214,7 +214,7 @@ Every random operation uses `ChaCha8Rng` with explicit seeds. To reproduce any f
 ### Custom Invariants
 
 ```rust
-use industrial_test_core::model::{Invariant, Graph, GraphError};
+use anvil_core::model::{Invariant, Graph, GraphError};
 
 struct MaxDegree(usize);
 
@@ -236,7 +236,7 @@ impl Invariant for MaxDegree {
 ### Custom Test Cases
 
 ```rust
-use industrial_test_core::runner::{TestSuite, TestCase};
+use anvil_core::runner::{TestSuite, TestCase};
 
 let mut suite = TestSuite::new("my_domain");
 suite.add(
@@ -255,7 +255,7 @@ suite.add(
 from orchestrator.runner import TestOrchestrator, RunConfig
 
 config = RunConfig(
-    rust_binary="./target/release/industrial-test",
+    rust_binary="./target/release/anvil",
     seed=42,
     parallel=True,
 )

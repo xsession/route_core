@@ -1,7 +1,7 @@
 [project]
-name = "industrial-test-orchestrator"
+name = "anvil-orchestrator"
 version = "0.1.0"
-description = "Test orchestration layer for industrial testing framework"
+description = "Test orchestration layer for Anvil testing framework"
 requires-python = ">=3.10"
 license = {text = "MIT"}
 

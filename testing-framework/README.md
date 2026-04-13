@@ -1,6 +1,6 @@
-# Industrial Test Framework
+# Anvil Test Framework
 
-Production-grade testing framework for professional industrial GUI applications.
+Production-grade testing framework for professional GUI applications.
 
 ## Quick Start
 
@@ -23,20 +23,20 @@ cargo build --workspace --release
 cargo test --workspace
 
 # CLI-based test runner
-cargo run -p industrial-test-cli -- run
+cargo run -p anvil-cli -- run
 
 # Property-based tests
-cargo run -p industrial-test-cli -- property --cases 200
+cargo run -p anvil-cli -- property --cases 200
 
 # CRDT simulation
-cargo run -p industrial-test-cli -- crdt --clients 5 --ops 50
+cargo run -p anvil-cli -- crdt --clients 5 --ops 50
 
 # Benchmarks
 cargo bench --bench model_bench
-cargo run -p industrial-test-cli -- bench --iterations 100 --csv
+cargo run -p anvil-cli -- bench --iterations 100 --csv
 
 # Stress test
-cargo run -p industrial-test-cli -- stress --nodes 10000 --edges 30000
+cargo run -p anvil-cli -- stress --nodes 10000 --edges 30000
 ```
 
 ### Python Orchestrator

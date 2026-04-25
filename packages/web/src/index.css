@@ -3,6 +3,10 @@
    Professional Design System (Splice CAD inspired - Dark Theme)
    ============================================================ */
 
+/* ISA-101 HMI design tokens — must be first so all @import
+   order-dependent rules resolve correctly */
+@import './hmi/tokens.css';
+
 /* === Reset & Base === */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 

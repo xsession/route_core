@@ -1,31 +1,20 @@
 {
-  "name": "route-core",
-  "version": "0.1.0",
+  "name": "routecore-offline-studio",
+  "version": "0.4.0",
   "private": true,
-  "description": "Cable harness design and management platform",
-  "workspaces": [
-    "packages/*"
-  ],
+  "type": "module",
+  "description": "RouteCore is an offline-first wiring-harness CAD studio with a local SQLite backend and reusable TypeScript editor core.",
   "scripts": {
-    "dev": "npm run dev --workspace=packages/web",
-    "dev:server": "npm run dev --workspace=packages/server",
-    "build": "npm run build --workspaces",
-    "build:core": "npm run build --workspace=packages/core",
-    "build:server": "npm run build --workspace=packages/server",
-    "build:web": "npm run build --workspace=packages/web",
-    "test": "npm run test --workspaces --if-present",
-    "test:core": "npm run test --workspace=packages/core",
-    "test:server": "npm run test --workspace=packages/server",
-    "test:coverage": "npm run test:coverage --workspaces --if-present",
-    "lint": "eslint packages/*/src --ext .ts,.tsx",
-    "clean": "rimraf packages/*/dist packages/*/coverage",
-    "typecheck": "tsc --noEmit -p packages/core/tsconfig.json && tsc --noEmit -p packages/server/tsconfig.json"
-  },
-  "devDependencies": {
-    "typescript": "^5.4.0",
-    "eslint": "^9.0.0"
+    "build": "node scripts/build.mjs",
+    "start": "node apps/studio/server/main.mjs --open",
+    "start:no-open": "node apps/studio/server/main.mjs",
+    "test": "node --test tests/*.test.mjs && npm --prefix packages/harness-editor-core test",
+    "check": "npm run build && npm test",
+    "demo:project": "node scripts/create-demo-project.mjs",
+    "package": "node scripts/package.mjs"
   },
   "engines": {
-    "node": ">=18.0.0"
-  }
+    "node": ">=22.5"
+  },
+  "license": "MIT"
 }

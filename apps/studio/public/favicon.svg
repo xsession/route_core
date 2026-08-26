@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="RouteCore">
+  <rect x="3" y="3" width="58" height="58" rx="12" fill="#1976d2"/>
+  <circle cx="17" cy="18" r="5" fill="#ffffff"/>
+  <circle cx="47" cy="46" r="5" fill="#ffffff"/>
+  <path d="M17 23v8h15c8 0 15 7 15 15" fill="none" stroke="#ffffff" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="32" cy="31" r="3" fill="#8fd0ff"/>
+</svg>

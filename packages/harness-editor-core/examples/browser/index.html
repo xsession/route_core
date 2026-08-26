@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>RouteCore Harness Editor Core Demo</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <header class="toolbar">
+    <div class="brand">RouteCore Editor Core</div>
+    <button id="fit">Fit</button>
+    <button id="undo">Undo</button>
+    <button id="redo">Redo</button>
+    <button id="route">Auto-route</button>
+    <button id="rotate">Rotate</button>
+    <button id="theme">Dark</button>
+    <span id="status" class="status">Ready</span>
+  </header>
+  <main class="workspace">
+    <aside class="panel tree-panel">
+      <h2>Scene</h2>
+      <div id="scene-tree"></div>
+      <h2>Interaction</h2>
+      <dl class="help">
+        <dt>Move</dt><dd>Drag component or label</dd>
+        <dt>Wire</dt><dd>Drag port to port</dd>
+        <dt>Route</dt><dd>Select wire; drag a segment</dd>
+        <dt>Select</dt><dd>Window right, crossing left</dd>
+        <dt>Pan</dt><dd>Middle drag or Space drag</dd>
+        <dt>Zoom</dt><dd>Mouse wheel</dd>
+        <dt>Modifiers</dt><dd>Shift axis lock, Alt no snap</dd>
+      </dl>
+    </aside>
+    <section id="canvas-shell" class="canvas-shell" tabindex="0" aria-label="Harness editor canvas">
+      <div id="canvas"></div>
+      <div id="diagnostics" class="diagnostics"></div>
+    </section>
+    <aside class="panel inspector-panel">
+      <h2>Inspector</h2>
+      <div id="inspector" class="inspector-empty">Select a component, wire, or label.</div>
+    </aside>
+  </main>
+  <script type="module" src="./app.js"></script>
+</body>
+</html>

@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="dark light" />
+  <meta name="application-name" content="RouteCore Offline Studio" />
+  <title>RouteCore Offline Studio</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <div id="app" class="app" data-theme="dark" data-density="compact">
+    <header class="app-header">
+      <div class="menu-bar">
+        <div class="brand" title="RouteCore">
+          <span class="brand-mark" aria-hidden="true">RC</span>
+          <span class="brand-name">RouteCore</span>
+          <span class="brand-edition">Offline Studio</span>
+        </div>
+        <nav id="main-menu" class="main-menu" aria-label="Application menu">
+          <button class="menu-trigger" data-menu="file">File</button>
+          <button class="menu-trigger" data-menu="edit">Edit</button>
+          <button class="menu-trigger" data-menu="view">View</button>
+          <button class="menu-trigger" data-menu="insert">Insert</button>
+          <button class="menu-trigger" data-menu="route">Route</button>
+          <button class="menu-trigger" data-menu="tools">Tools</button>
+          <button class="menu-trigger" data-menu="help">Help</button>
+        </nav>
+        <div class="menu-spacer"></div>
+        <div id="save-indicator" class="save-indicator" data-state="saved">
+          <span class="save-dot"></span>
+          <span class="save-label">Saved locally</span>
+        </div>
+        <button id="offline-indicator" class="offline-indicator" title="No remote services are used">Offline</button>
+      </div>
+      <div class="command-bar" role="toolbar" aria-label="Main commands">
+        <div class="command-group">
+          <button class="command-button command-primary" id="new-project" title="New project (Ctrl+N)"><span class="command-icon">＋</span><span>New</span></button>
+          <button class="command-button" id="open-project" title="Open project (Ctrl+O)"><span class="command-icon">↗</span><span>Open</span></button>
+          <button class="command-button" id="checkpoint-project" title="Save checkpoint (Ctrl+S)"><span class="command-icon">◆</span><span>Checkpoint</span></button>
+        </div>
+        <span class="command-divider"></span>
+        <div class="command-group">
+          <button class="command-button icon-only" id="undo" title="Undo (Ctrl+Z)">↶</button>
+          <button class="command-button icon-only" id="redo" title="Redo (Ctrl+Y)">↷</button>
+        </div>
+        <span class="command-divider"></span>
+        <div class="command-group">
+          <button class="command-button" id="add-component"><span class="command-icon">▣</span><span>Component</span></button>
+          <button class="command-button" id="component-creator"><span class="command-icon">◫</span><span>Creator</span></button>
+          <button class="command-button" id="add-label"><span class="command-icon">T</span><span>Label</span></button>
+          <button class="command-button" id="cable-creator"><span class="command-icon">≋</span><span>Cable</span></button>
+        </div>
+        <span class="command-divider"></span>
+        <div class="command-group">
+          <button class="command-button" id="auto-route"><span class="command-icon">⌁</span><span>Auto-route</span></button>
+          <button class="command-button" id="rotate-selection"><span class="command-icon">↻</span><span>Rotate</span></button>
+          <button class="command-button" id="generate-assembly"><span class="command-icon">◇</span><span>Assembly</span></button>
+        </div>
+        <div class="command-spacer"></div>
+        <div class="command-group">
+          <button class="command-button icon-only" id="zoom-out" title="Zoom out">−</button>
+          <button class="zoom-readout" id="zoom-readout" title="Reset zoom">100%</button>
+          <button class="command-button icon-only" id="zoom-in" title="Zoom in">＋</button>
+          <button class="command-button" id="fit-view"><span class="command-icon">⌗</span><span>Fit</span></button>
+          <button class="command-button icon-only" id="toggle-theme" title="Toggle light/dark theme">◐</button>
+        </div>
+      </div>
+      <div id="model-tabs" class="model-tabs" role="tablist" aria-label="Open design models"></div>
+    </header>
+
+    <main class="workspace">
+      <aside id="left-panel" class="dock dock-left">
+        <div class="dock-tabs" role="tablist">
+          <button class="dock-tab active" data-left-tab="explorer">Explorer</button>
+          <button class="dock-tab" data-left-tab="library">Library</button>
+          <button class="dock-tab" data-left-tab="bom">BOM</button>
+        </div>
+        <div id="left-content" class="dock-content"></div>
+      </aside>
+      <div class="splitter splitter-left" data-splitter="left" role="separator" aria-orientation="vertical"></div>
+
+      <section class="editor-column">
+        <div class="editor-header">
+          <div id="breadcrumb" class="breadcrumb"></div>
+          <div id="view-tabs" class="view-tabs" role="tablist"></div>
+          <div class="editor-header-actions">
+            <button id="toggle-grid" class="mini-button active" title="Toggle grid">Grid</button>
+            <button id="toggle-snap" class="mini-button active" title="Toggle snapping">Snap</button>
+            <button id="toggle-bottom" class="mini-button" title="Toggle diagnostics panel">Problems</button>
+          </div>
+        </div>
+        <div class="canvas-region">
+          <div id="tool-rail" class="tool-rail" role="toolbar" aria-label="Editor tools">
+            <button class="tool-button active" data-tool="select" title="Select (V)"><span>↖</span><small>Select</small></button>
+            <button class="tool-button" data-tool="pan" title="Pan (H)"><span>✥</span><small>Pan</small></button>
+            <button class="tool-button" data-tool="wire" title="Wire (W)"><span>⌁</span><small>Wire</small></button>
+            <button class="tool-button" data-tool="label" title="Label (L)"><span>T</span><small>Label</small></button>
+            <button class="tool-button" data-tool="component" title="Place component (C)"><span>▣</span><small>Place</small></button>
+            <span class="tool-separator"></span>
+            <button class="tool-button" id="tool-route" title="Route selected wire"><span>⌗</span><small>Route</small></button>
+            <button class="tool-button" id="tool-delete" title="Delete selection"><span>⌫</span><small>Delete</small></button>
+          </div>
+          <section id="canvas-shell" class="canvas-shell" tabindex="0" aria-label="Harness CAD editor canvas">
+            <div id="canvas" class="canvas"></div>
+            <div id="canvas-empty" class="canvas-empty" hidden>
+              <div class="empty-symbol">▣─⌁─▣</div>
+              <h2>Start the harness topology</h2>
+              <p>Place a component from the local library, then drag from one port to another.</p>
+              <button id="empty-add-component" class="primary-button">Place component</button>
+            </div>
+            <div id="canvas-coordinates" class="canvas-coordinates">X 0.0 &nbsp; Y 0.0</div>
+            <div id="connection-hint" class="connection-hint" hidden></div>
+          </section>
+        </div>
+        <section id="bottom-panel" class="bottom-panel" data-open="true">
+          <div class="bottom-tabs">
+            <button class="bottom-tab active" data-bottom-tab="problems">Problems <span id="problem-count" class="badge">0</span></button>
+            <button class="bottom-tab" data-bottom-tab="nets">Connectivity</button>
+            <button class="bottom-tab" data-bottom-tab="history">History</button>
+            <button class="bottom-tab" data-bottom-tab="output">Output</button>
+            <div class="bottom-spacer"></div>
+            <button id="close-bottom" class="panel-close" title="Close panel">×</button>
+          </div>
+          <div id="bottom-content" class="bottom-content"></div>
+        </section>
+      </section>
+
+      <div class="splitter splitter-right" data-splitter="right" role="separator" aria-orientation="vertical"></div>
+      <aside id="right-panel" class="dock dock-right">
+        <div class="dock-tabs" role="tablist">
+          <button class="dock-tab active" data-right-tab="properties">Properties</button>
+          <button class="dock-tab" data-right-tab="style">Style</button>
+          <button class="dock-tab" data-right-tab="rules">Rules</button>
+        </div>
+        <div id="right-content" class="dock-content inspector-content"></div>
+      </aside>
+    </main>
+
+    <footer class="status-bar">
+      <div id="status-message" class="status-message">Ready</div>
+      <div class="status-spacer"></div>
+      <div id="selection-status" class="status-item">No selection</div>
+      <div id="route-status" class="status-item">Router ready</div>
+      <div id="document-status" class="status-item">Revision 0</div>
+      <div class="status-item offline-status">LOCAL</div>
+    </footer>
+
+    <div id="menu-popup-root"></div>
+    <div id="context-menu-root"></div>
+    <div id="modal-root"></div>
+    <div id="toast-root" class="toast-root" aria-live="polite"></div>
+  </div>
+  <script type="module" src="/js/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,44 @@
+{
+  "name": "@routecore/harness-editor-core",
+  "version": "0.3.0",
+  "description": "Framework-agnostic RouteCore TypeScript engine for harness CAD components, ports, wires, labels, routing, interaction, validation, and SVG rendering.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE",
+    "docs",
+    "examples",
+    "scripts/render-sample.mjs"
+  ],
+  "scripts": {
+    "clean": "rm -rf dist",
+    "build": "tsc -p tsconfig.json",
+    "test": "npm run build && node --test test/*.test.mjs",
+    "check": "npm run test",
+    "demo": "npm run build && node -e \"console.log('Open examples/browser/index.html through a local static server')\"",
+    "render:sample": "npm run build && node scripts/render-sample.mjs"
+  },
+  "keywords": [
+    "visual-editor",
+    "diagram",
+    "cad",
+    "wiring-harness",
+    "svg",
+    "orthogonal-routing",
+    "offline-first"
+  ],
+  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
+  "sideEffects": false
+}

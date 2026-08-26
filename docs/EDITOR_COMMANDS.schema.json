@@ -1,0 +1,269 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://routecore.local/schema/editor-commands-1.json",
+  "title": "RouteCore Visual Editor Command Envelope",
+  "description": "Clean-room, offline-first command contract for deterministic visual editor operations.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "commandId", "projectId", "modelId", "actorId", "issuedAt", "payload"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "commandId": { "$ref": "#/$defs/id" },
+    "projectId": { "$ref": "#/$defs/id" },
+    "modelId": { "$ref": "#/$defs/id" },
+    "pageId": { "$ref": "#/$defs/id" },
+    "actorId": { "$ref": "#/$defs/id" },
+    "issuedAt": { "type": "string", "format": "date-time" },
+    "baseRevision": { "type": "integer", "minimum": 0 },
+    "transactionId": { "$ref": "#/$defs/id" },
+    "mergeKey": { "type": "string", "maxLength": 256 },
+    "payload": {
+      "oneOf": [
+        { "$ref": "#/$defs/componentTransform" },
+        { "$ref": "#/$defs/componentRebuild" },
+        { "$ref": "#/$defs/pinBankUpdate" },
+        { "$ref": "#/$defs/pinMutation" },
+        { "$ref": "#/$defs/wireConnect" },
+        { "$ref": "#/$defs/wireReconnect" },
+        { "$ref": "#/$defs/wireStyleUpdate" },
+        { "$ref": "#/$defs/routeAuto" },
+        { "$ref": "#/$defs/routeConstraintUpsert" },
+        { "$ref": "#/$defs/routeConstraintRemove" },
+        { "$ref": "#/$defs/routeSegmentMove" },
+        { "$ref": "#/$defs/labelUpdate" },
+        { "$ref": "#/$defs/selectionArrange" }
+      ]
+    }
+  },
+  "$defs": {
+    "id": { "type": "string", "minLength": 1, "maxLength": 256 },
+    "point": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["x", "y"],
+      "properties": { "x": { "type": "integer" }, "y": { "type": "integer" } }
+    },
+    "rect": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["x", "y", "width", "height"],
+      "properties": {
+        "x": { "type": "integer" }, "y": { "type": "integer" },
+        "width": { "type": "integer", "minimum": 0 }, "height": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "portEndpoint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "componentId", "portId"],
+      "properties": {
+        "kind": { "const": "port" },
+        "componentId": { "$ref": "#/$defs/id" },
+        "portId": { "$ref": "#/$defs/id" }
+      }
+    },
+    "freeEndpoint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "point"],
+      "properties": {
+        "kind": { "enum": ["free", "off_page", "junction"] },
+        "point": { "$ref": "#/$defs/point" },
+        "direction": { "enum": ["north", "east", "south", "west"] },
+        "reference": { "type": "string" },
+        "junctionId": { "$ref": "#/$defs/id" }
+      }
+    },
+    "endpoint": { "oneOf": [{ "$ref": "#/$defs/portEndpoint" }, { "$ref": "#/$defs/freeEndpoint" }] },
+    "componentTransform": {
+      "type": "object", "additionalProperties": false,
+      "required": ["type", "componentIds"],
+      "properties": {
+        "type": { "const": "editor.component.transform" },
+        "componentIds": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/id" } },
+        "translation": { "$ref": "#/$defs/point" },
+        "rotationQuarterTurns": { "type": "integer", "minimum": -3, "maximum": 3 },
+        "mirrorX": { "type": "boolean" },
+        "mirrorY": { "type": "boolean" },
+        "size": { "type": "object", "required": ["width", "height"], "properties": { "width": { "type": "integer", "minimum": 1 }, "height": { "type": "integer", "minimum": 1 } }, "additionalProperties": false },
+        "snapMode": { "enum": ["none", "grid", "alignment", "ports", "combined"] }
+      },
+      "anyOf": [{ "required": ["translation"] }, { "required": ["rotationQuarterTurns"] }, { "required": ["mirrorX"] }, { "required": ["mirrorY"] }, { "required": ["size"] }]
+    },
+    "componentRebuild": {
+      "type": "object", "additionalProperties": false,
+      "required": ["type", "componentId", "reason", "connectedPortRemovalPolicy"],
+      "properties": {
+        "type": { "const": "editor.component.rebuild" },
+        "componentId": { "$ref": "#/$defs/id" },
+        "reason": { "enum": ["definition_changed", "pin_count_changed", "fit_content", "style_changed", "view_mode_changed"] },
+        "connectedPortRemovalPolicy": { "enum": ["prevent", "detach", "remap_by_label"] },
+        "preserveManualSize": { "type": "boolean" },
+        "preserveManualLabels": { "type": "boolean" },
+        "rerouteMode": { "enum": ["none", "preview", "full"] }
+      }
+    },
+    "pinBankUpdate": {
+      "type": "object", "additionalProperties": false,
+      "required": ["type", "componentId", "bankId", "patch"],
+      "properties": {
+        "type": { "const": "editor.pin_bank.update" },
+        "componentId": { "$ref": "#/$defs/id" },
+        "bankId": { "$ref": "#/$defs/id" },
+        "patch": {
+          "type": "object", "additionalProperties": false,
+          "properties": {
+            "side": { "enum": ["north", "east", "south", "west"] },
+            "flow": { "enum": ["forward", "reverse", "center_out"] },
+            "collapsed": { "type": "boolean" },
+            "collapseEmpty": { "type": "boolean" },
+            "edgePadding": { "type": "integer", "minimum": 0 },
+            "rowGap": { "type": "integer", "minimum": 0 },
+            "portIds": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/id" } }
+          },
+          "minProperties": 1
+        }
+      }
+    },
+    "pinMutation": {
+      "type": "object", "additionalProperties": false,
+      "required": ["type", "componentId", "operations", "connectedPortRemovalPolicy"],
+      "properties": {
+        "type": { "const": "editor.pin.mutate" },
+        "componentId": { "$ref": "#/$defs/id" },
+        "connectedPortRemovalPolicy": { "enum": ["prevent", "detach", "remap_by_label"] },
+        "operations": {
+          "type": "array", "minItems": 1,
+          "items": {
+            "oneOf": [
+              { "type": "object", "additionalProperties": false, "required": ["op", "port"], "properties": { "op": { "const": "add" }, "port": { "type": "object" }, "afterPortId": { "$ref": "#/$defs/id" } } },
+              { "type": "object", "additionalProperties": false, "required": ["op", "portId"], "properties": { "op": { "const": "remove" }, "portId": { "$ref": "#/$defs/id" } } },
+              { "type": "object", "additionalProperties": false, "required": ["op", "portId", "patch"], "properties": { "op": { "const": "update" }, "portId": { "$ref": "#/$defs/id" }, "patch": { "type": "object" } } },
+              { "type": "object", "additionalProperties": false, "required": ["op", "portIds"], "properties": { "op": { "const": "reorder" }, "portIds": { "type": "array", "uniqueItems": true, "items": { "$ref": "#/$defs/id" } } } }
+            ]
+          }
+        }
+      }
+    },
+    "wireConnect": {
+      "type": "object", "additionalProperties": false,
+      "required": ["type", "wireId", "source", "target"],
+      "properties": {
+        "type": { "const": "editor.wire.connect" },
+        "wireId": { "$ref": "#/$defs/id" },
+        "source": { "$ref": "#/$defs/endpoint" },
+        "target": { "$ref": "#/$defs/endpoint" },
+        "kind": { "enum": ["discrete", "cable_core", "shield", "drain", "bundle", "mate", "annotation"] },
+        "routePattern": { "enum": ["direct", "orthogonal", "horizontal_first", "vertical_first", "dogleg_horizontal", "dogleg_vertical", "trunk_horizontal", "trunk_vertical", "manual"] },
+        "style": { "type": "object" }
+      }
+    },
+    "wireReconnect": {
+      "type": "object", "additionalProperties": false,
+      "required": ["type", "wireId", "end", "endpoint"],
+      "properties": {
+        "type": { "const": "editor.wire.reconnect" },
+        "wireId": { "$ref": "#/$defs/id" },
+        "end": { "enum": ["source", "target"] },
+        "endpoint": { "$ref": "#/$defs/endpoint" },
+        "onOccupiedTarget": { "enum": ["reject", "add", "move", "swap", "open_menu"] }
+      }
+    },
+    "wireStyleUpdate": {
+      "type": "object", "additionalProperties": false,
+      "required": ["type", "wireIds", "patch"],
+      "properties": {
+        "type": { "const": "editor.wire.style.update" },
+        "wireIds": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/id" } },
+        "patch": { "type": "object", "minProperties": 1 }
+      }
+    },
+    "routeAuto": {
+      "type": "object", "additionalProperties": false,
+      "required": ["type", "wireIds", "scope", "preserve"],
+      "properties": {
+        "type": { "const": "editor.route.auto" },
+        "wireIds": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/id" } },
+        "scope": { "enum": ["local", "page", "selection", "model"] },
+        "preserve": { "type": "array", "uniqueItems": true, "items": { "enum": ["locked_waypoints", "locked_segments", "exit_sides", "corridors", "manual_labels", "lane_order"] } },
+        "quality": { "enum": ["preview", "balanced", "maximum"] }
+      }
+    },
+    "routeConstraintUpsert": {
+      "type": "object", "additionalProperties": false,
+      "required": ["type", "wireId", "constraint"],
+      "properties": {
+        "type": { "const": "editor.route_constraint.upsert" },
+        "wireId": { "$ref": "#/$defs/id" },
+        "constraint": {
+          "type": "object", "additionalProperties": false,
+          "required": ["id", "kind", "strength", "ownerFrame"],
+          "properties": {
+            "id": { "$ref": "#/$defs/id" },
+            "kind": { "enum": ["waypoint", "locked_waypoint", "locked_segment", "corridor_horizontal", "corridor_vertical", "avoid_rect", "prefer_rect", "exit_side", "trunk_coordinate"] },
+            "strength": { "enum": ["soft", "strong", "hard"] },
+            "ownerFrame": { "enum": ["world", "source", "target"] },
+            "point": { "$ref": "#/$defs/point" },
+            "rect": { "$ref": "#/$defs/rect" },
+            "coordinate": { "type": "integer" },
+            "segmentIndex": { "type": "integer", "minimum": 0 },
+            "side": { "enum": ["north", "east", "south", "west"] }
+          }
+        }
+      }
+    },
+    "routeConstraintRemove": {
+      "type": "object", "additionalProperties": false,
+      "required": ["type", "wireId", "constraintIds"],
+      "properties": {
+        "type": { "const": "editor.route_constraint.remove" },
+        "wireId": { "$ref": "#/$defs/id" },
+        "constraintIds": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "$ref": "#/$defs/id" } }
+      }
+    },
+    "routeSegmentMove": {
+      "type": "object", "additionalProperties": false,
+      "required": ["type", "wireId", "segmentIndex", "delta"],
+      "properties": {
+        "type": { "const": "editor.route.segment.move" },
+        "wireId": { "$ref": "#/$defs/id" },
+        "segmentIndex": { "type": "integer", "minimum": 0 },
+        "delta": { "$ref": "#/$defs/point" },
+        "lockResult": { "type": "boolean" }
+      }
+    },
+    "labelUpdate": {
+      "type": "object", "additionalProperties": false,
+      "required": ["type", "labelId", "patch"],
+      "properties": {
+        "type": { "const": "editor.label.update" },
+        "labelId": { "$ref": "#/$defs/id" },
+        "patch": {
+          "type": "object", "additionalProperties": false, "minProperties": 1,
+          "properties": {
+            "text": { "type": "string" },
+            "secondaryText": { "type": ["string", "null"] },
+            "mode": { "enum": ["auto", "owner_relative", "world_pinned"] },
+            "offset": { "$ref": "#/$defs/point" },
+            "worldPosition": { "$ref": "#/$defs/point" },
+            "wireFractionPpm": { "type": "integer", "minimum": 0, "maximum": 1000000 },
+            "orientation": { "enum": ["horizontal", "vertical", "follow_segment"] },
+            "visible": { "type": "boolean" },
+            "locked": { "type": "boolean" },
+            "style": { "type": "object" }
+          }
+        }
+      }
+    },
+    "selectionArrange": {
+      "type": "object", "additionalProperties": false,
+      "required": ["type", "entityIds", "operation"],
+      "properties": {
+        "type": { "const": "editor.selection.arrange" },
+        "entityIds": { "type": "array", "minItems": 2, "uniqueItems": true, "items": { "$ref": "#/$defs/id" } },
+        "operation": { "enum": ["align_left", "align_center_x", "align_right", "align_top", "align_center_y", "align_bottom", "distribute_x", "distribute_y", "equalize_width", "equalize_height", "flip_route_order"] },
+        "reference": { "enum": ["selection_bounds", "primary", "first", "last", "page"] }
+      }
+    }
+  }
+}

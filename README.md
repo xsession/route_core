@@ -1,82 +1,73 @@
-# Route Core — Cable Harness Designer
+# RouteCore Offline Studio
 
-A full-stack cable harness design and management platform. Design cable assemblies, manage a parts library, create custom components and cables, generate BOMs, and export schematics.
+RouteCore Offline Studio is a working offline-first wiring-harness visual editor built from the clean-room specification in `docs/`. It combines a framework-neutral TypeScript editor kernel with a local Node.js application server and a single-file SQLite `.routecore` project database.
 
-## Architecture
+## Implemented
 
+- Dense CAD shell with Explorer, local Library, BOM, Properties, Style, Rules, Problems, Connectivity, History, and Output docks.
+- Dynamic components with measured collision-safe four-sided pin banks, automatic body sizing, stable pin identities, rotation, mirroring, pin-matrix rebuilds, and connected-pin detach handling.
+- Interactive component dragging, marquee selection, panning, focal zoom, snapping, port-to-port wire creation, route-segment manipulation, labels, undo/redo, context menus, and keyboard commands.
+- Direct, orthogonal, dogleg, trunk, horizontal-first, vertical-first, and manual routing with lead-ins, obstacle clearance, deterministic rounded bends, route constraints, and diagnostics.
+- Solid, stripe, tracer, dual, shield, and layered wire appearances with engineering colors preserved under selection and validation overlays.
+- Background-aware label contrast keeps default annotations readable in both light and dark application themes while preserving explicit engineering colors.
+- Local component and cable libraries, reusable Cable Creator and Component Creator, core-to-conductor assignment, BOM assignments, and manufacturing metadata.
+- Plan Layout and Schematic views, generated Assembly models with stable origin mappings, immutable revisions, non-destructive command-history checkout, project checkpoints, integrity checks, and eight local exports.
+- Loopback-only HTTP runtime, strict CSP, no telemetry, no accounts, no cloud API, no external fonts, and no runtime package dependencies.
+
+## Run
+
+Requirements: Node.js 22 or newer. The packaged release already includes compiled frontend and editor-core JavaScript; no `npm install` step is required.
+
+Portable launchers:
+
+```text
+Windows:        run.cmd
+Linux / macOS: ./run.sh
 ```
-packages/
-├── core/       # Data models, business logic, export engine (TypeScript)
-├── server/     # REST API with SQLite persistence (Express)
-└── web/        # Interactive design UI (React + Vite)
-```
 
-## Modules
+The launchers keep application settings and the local reusable-part libraries in the extracted release folder under `data/`. See `START_HERE.md` for the shortest setup path.
 
-| Module | Description |
-|--------|-------------|
-| **Harness Builder** | Drag-and-drop canvas for placing components and routing wires with SVG rendering |
-| **Parts Library** | Searchable database of connectors, terminals, relays, motors, and more |
-| **Component Creator** | Create custom components from templates or fully custom pin layouts |
-| **Cable Creator** | Define multi-conductor cables with conductor specs, shielding, and jacket properties |
-| **BOM Generator** | Automatic bill of materials with CSV export |
-| **Export Engine** | SVG schematic export, JSON save/load, netlist generation |
-| **Validator** | Design rule checking for unconnected pins, current ratings, duplicate labels |
-| **Wire Router** | Smart Manhattan routing for wire paths between component pins |
-| **Version Control** | Built-in revision snapshots with rollback support |
-
-## Quick Start
+![RouteCore deterministic editor sample](packages/harness-editor-core/examples/sample-output.png)
 
 ```bash
-# Install dependencies
-npm install
-
-# Start the API server (port 3001)
-npm run dev:server
-
-# Start the frontend dev server (port 5173)
-npm run dev
+node apps/studio/server/main.mjs --open
 ```
 
-Open http://localhost:5173 in your browser.
+Use a specific project:
 
-## Tech Stack
+```bash
+node apps/studio/server/main.mjs --open --project ./RouteCore-Demonstration.routecore
+```
 
-- **Core**: TypeScript (ES2022, strict mode)
-- **Frontend**: React 18, Zustand (state), Vite
-- **Backend**: Express, better-sqlite3
-- **Canvas**: SVG-based rendering with interactive pan/zoom
+The server binds only to `127.0.0.1` or `::1`. By default, non-portable direct launches keep settings and libraries in `~/.routecore`; set `ROUTECORE_HOME` to choose another local directory. RouteCore writes new projects as `.routecore` files and can open legacy `.ohcad` project files without conversion.
 
-## Seed Data
+## Build and test
 
-The parts library ships with pre-loaded components:
-- JST PH/XH connectors
-- Molex Micro-Fit 3.0
-- DB9 D-Sub connectors
-- M12 industrial circular connectors
-- Phoenix Contact terminal blocks
-- Relays, fuses, circuit breakers
-- DIN rail power supplies
-- Motors and switches
+TypeScript 5.8 or newer is needed only to rebuild from source.
 
-## API Endpoints
+```bash
+npm run build
+npm test
+npm run check
+```
 
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/api/harnesses` | List all harness designs |
-| POST | `/api/harnesses` | Create new harness |
-| GET | `/api/harnesses/:id` | Get harness by ID |
-| PUT | `/api/harnesses/:id` | Update harness |
-| DELETE | `/api/harnesses/:id` | Delete harness |
-| GET | `/api/parts?q=&category=` | Search parts library |
-| POST | `/api/parts` | Add custom component |
-| GET | `/api/cables` | List cables |
-| POST | `/api/cables` | Create cable |
-| POST | `/api/export/validate` | Validate harness design |
-| POST | `/api/export/bom` | Generate BOM |
-| POST | `/api/export/svg` | Export SVG schematic |
-| POST | `/api/export/netlist` | Export netlist |
+Create the included reference project:
 
-## License
+```bash
+npm run demo:project
+```
 
-See [LICENSE](./LICENSE)
+## Project layout
+
+- `apps/studio/public` — offline browser UI and compiled frontend.
+- `apps/studio/server` — loopback HTTP API, project service, SQLite persistence, and exporters.
+- `packages/harness-editor-core` — reusable TypeScript editor engine.
+- `database` — baseline, editor, and application schemas.
+- `docs` — clean-room editor, interaction, routing, and command specifications.
+- `tests` — application, database, API, export, security, and offline-runtime tests.
+- `START_HERE.md`, `run.cmd`, `run.sh` — portable release launch path.
+- `docs/VALIDATION_REPORT.md` — release qualification evidence and boundaries.
+
+## Scope
+
+This release is a substantial runnable implementation and reference architecture. It is not represented as a byte-for-byte clone of any commercial product. Production certification still requires organization-specific manufacturing rules, format qualification against target ERP/PLM systems, accessibility audits, and profiling on extremely large harnesses.

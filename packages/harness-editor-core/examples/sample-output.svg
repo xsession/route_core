@@ -1,0 +1,133 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-115 -180 1154.22 565" width="100%" height="100%" preserveAspectRatio="xMidYMid meet" role="graphics-document" aria-label="Harness visual editor canvas" data-routecore-schema="1">
+<title>Harness visual editor</title>
+<desc>Offline cable and wiring-harness editor scene with components, ports, wires, labels, and routing handles.</desc>
+<defs>
+<pattern id="routecore-grid-minor" width="10" height="10" patternUnits="userSpaceOnUse"><path d="M 10 0 L 0 0 0 10" fill="none" stroke="#dfe3e8" stroke-width="0.6" opacity="0.32" vector-effect="non-scaling-stroke"/></pattern>
+<pattern id="routecore-grid-major" width="50" height="50" patternUnits="userSpaceOnUse"><rect width="50" height="50" fill="url(#routecore-grid-minor)"/><path d="M 50 0 L 0 0 0 50" fill="none" stroke="#c6ccd4" stroke-width="1" opacity="0.32" vector-effect="non-scaling-stroke"/></pattern>
+</defs>
+<rect x="-115" y="-180" width="1154.22" height="565" fill="#f7f8fa"/>
+<g id="routecore-grid-layer" pointer-events="none"><rect x="-115" y="-180" width="1154.22" height="565" fill="url(#routecore-grid-major)"/></g>
+<g id="routecore-wire-layer"><g class="routecore-wire" data-wire-id="W1" role="graphics-symbol" aria-label="VBAT"><title>VBAT</title><path class="routecore-wire-outline" d="M 155 51.5 L 271.7 51.5 A 2.5 2.5 0 0 0 274.2 49 L 274.2 49 A 2.5 2.5 0 0 1 276.7 46.5 L 302.2 46.5" fill="none" stroke="#ffffff" stroke-width="6" stroke-opacity="0.8" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/><path class="routecore-wire-stroke" d="M 155 51.5 L 271.7 51.5 A 2.5 2.5 0 0 0 274.2 49 L 274.2 49 A 2.5 2.5 0 0 1 276.7 46.5 L 302.2 46.5" fill="none" stroke="#dc2626" stroke-width="4" stroke-opacity="1" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/></g>
+<g class="routecore-wire" data-wire-id="W2" role="graphics-symbol" aria-label="GND"><title>GND</title><path class="routecore-wire-outline" d="M 155 86.5 L 180.5 86.5 A 2.5 2.5 0 0 0 183 84 L 183 84 A 2.5 2.5 0 0 1 185.5 81.5 L 302.2 81.5" fill="none" stroke="#ffffff" stroke-width="6" stroke-opacity="0.8" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/><path class="routecore-wire-stroke" d="M 155 86.5 L 180.5 86.5 A 2.5 2.5 0 0 0 183 84 L 183 84 A 2.5 2.5 0 0 1 185.5 81.5 L 302.2 81.5" fill="none" stroke="#111827" stroke-width="4" stroke-opacity="1" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/><path class="routecore-wire-stroke" d="M 155 86.5 L 180.5 86.5 A 2.5 2.5 0 0 0 183 84 L 183 84 A 2.5 2.5 0 0 1 185.5 81.5 L 302.2 81.5" fill="none" stroke="#facc15" stroke-width="1.5" stroke-opacity="1" stroke-linecap="butt" stroke-linejoin="round" vector-effect="non-scaling-stroke" stroke-dasharray="7 7"/></g>
+<g class="routecore-wire" data-wire-id="W3" role="graphics-symbol" aria-label="CAN_H"><title>CAN_H</title><path class="routecore-wire-outline" d="M 155 121.5 L 181.75 121.5 A 1.25 1.25 0 0 0 183 120.25 L 183 120.25 A 1.25 1.25 0 0 1 184.25 119 L 272.95 119 A 1.25 1.25 0 0 0 274.2 117.75 L 274.2 117.75 A 1.25 1.25 0 0 1 275.45 116.5 L 302.2 116.5" fill="none" stroke="#ffffff" stroke-width="6" stroke-opacity="0.8" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/><path class="routecore-wire-stroke" d="M 155 121.5 L 181.75 121.5 A 1.25 1.25 0 0 0 183 120.25 L 183 120.25 A 1.25 1.25 0 0 1 184.25 119 L 272.95 119 A 1.25 1.25 0 0 0 274.2 117.75 L 274.2 117.75 A 1.25 1.25 0 0 1 275.45 116.5 L 302.2 116.5" fill="none" stroke="#16a34a" stroke-width="4" stroke-opacity="1" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/><path class="routecore-wire-stroke" d="M 155 121.5 L 181.75 121.5 A 1.25 1.25 0 0 0 183 120.25 L 183 120.25 A 1.25 1.25 0 0 1 184.25 119 L 272.95 119 A 1.25 1.25 0 0 0 274.2 117.75 L 274.2 117.75 A 1.25 1.25 0 0 1 275.45 116.5 L 302.2 116.5" fill="none" stroke="#ffffff" stroke-width="1.36" stroke-opacity="1" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke" stroke-dasharray="5 11"/></g>
+<g class="routecore-wire" data-wire-id="W4" role="graphics-symbol" aria-label="CAN_L"><title>CAN_L</title><path class="routecore-wire-outline" d="M 155 156.5 L 182 156.5 A 1 1 0 0 0 183 155.5 L 183 155 A 1 1 0 0 1 184 154 L 273.2 154 A 1 1 0 0 0 274.2 153 L 274.2 152.5 A 1 1 0 0 1 275.2 151.5 L 302.2 151.5" fill="none" stroke="#ffffff" stroke-width="6" stroke-opacity="0.8" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/><path class="routecore-wire-stroke" d="M 155 156.5 L 182 156.5 A 1 1 0 0 0 183 155.5 L 183 155 A 1 1 0 0 1 184 154 L 273.2 154 A 1 1 0 0 0 274.2 153 L 274.2 152.5 A 1 1 0 0 1 275.2 151.5 L 302.2 151.5" fill="none" stroke="#16a34a" stroke-width="4" stroke-opacity="1" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/><path class="routecore-wire-stroke" d="M 155 156.5 L 182 156.5 A 1 1 0 0 0 183 155.5 L 183 155 A 1 1 0 0 1 184 154 L 273.2 154 A 1 1 0 0 0 274.2 153 L 274.2 152.5 A 1 1 0 0 1 275.2 151.5 L 302.2 151.5" fill="none" stroke="#facc15" stroke-width="2.2" stroke-opacity="1" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/></g>
+<g class="routecore-wire" data-wire-id="W5" role="graphics-symbol" aria-label="IGN"><title>IGN</title><path class="routecore-wire-outline" d="M 477.8 46.5 L 775 46.5 A 1 1 0 0 1 776 47.5 L 776 75" fill="none" stroke="#ffffff" stroke-width="6" stroke-opacity="0.8" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/><path class="routecore-wire-stroke" d="M 477.8 46.5 L 775 46.5 A 1 1 0 0 1 776 47.5 L 776 75" fill="none" stroke="#f97316" stroke-width="4" stroke-opacity="1" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/></g>
+<g class="routecore-wire" data-wire-id="W6" role="graphics-symbol" aria-label="WAKE"><title>WAKE</title><path class="routecore-wire-outline" d="M 477.8 151.5 L 495.8 151.5 A 10 10 0 0 0 505.8 141.5 L 505.8 57 A 10 10 0 0 1 515.8 47 L 731 47 A 10 10 0 0 1 741 57 L 741 75" fill="none" stroke="#ffffff" stroke-width="6" stroke-opacity="0.8" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/><path class="routecore-wire-stroke" d="M 477.8 151.5 L 495.8 151.5 A 10 10 0 0 0 505.8 141.5 L 505.8 57 A 10 10 0 0 1 515.8 47 L 731 47 A 10 10 0 0 1 741 57 L 741 75" fill="none" stroke="#94a3b8" stroke-width="7" stroke-opacity="0.72" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/><path class="routecore-wire-stroke" d="M 477.8 151.5 L 495.8 151.5 A 10 10 0 0 0 505.8 141.5 L 505.8 57 A 10 10 0 0 1 515.8 47 L 731 47 A 10 10 0 0 1 741 57 L 741 75" fill="none" stroke="#2563eb" stroke-width="4" stroke-opacity="1" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/></g></g>
+<g id="routecore-crossing-layer" pointer-events="none"></g>
+<g id="routecore-component-layer"><g class="routecore-component" data-component-id="A1" role="graphics-symbol" aria-label="A1, device, 6 connection points">
+<title>A1, device, 6 connection points</title>
+
+<rect x="302.2" y="-30" width="175.6" height="220" rx="4" fill="#ffffff" stroke="#4b5563" stroke-width="1.5" vector-effect="non-scaling-stroke"/>
+<rect x="302.2" y="-30" width="175.6" height="38" rx="4" fill="#f3f4f6"/>
+<rect x="302.2" y="30" width="58.57" height="33" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.5" vector-effect="non-scaling-stroke"/>
+<circle data-port-id="A1:1" cx="302.2" cy="46.5" r="4" fill="#111827" stroke="#ffffff" stroke-width="1.5" vector-effect="non-scaling-stroke"/>
+<text data-port-label-for="A1:1" x="318.29" y="39.5" text-anchor="middle" dominant-baseline="middle" font-family="ui-sans-serif, system-ui, sans-serif" font-size="10.5" fill="#334155">P1</text>
+<text data-port-function-for="A1:1" x="331.485" y="54" text-anchor="middle" dominant-baseline="middle" font-family="ui-sans-serif, system-ui, sans-serif" font-size="9.5" fill="#64748b">VBAT_IN</text>
+<rect x="408.21" y="30" width="69.59" height="33" fill="#f9fafb" stroke="#e5e7eb" stroke-width="0.5" vector-effect="non-scaling-stroke"/>
+<circle data-port-id="A1:5" cx="477.8" cy="46.5" r="4" fill="#111827" stroke="#ffffff" stroke-width="1.5" vector-effect="non-scaling-stroke"/>
+<text data-port-label-for="A1:5" x="461.71" y="39.5" text-anchor="middle" dominant-baseline="middle" font-family="ui-sans-serif, system-ui, sans-serif" font-size="10.5" fill="#334155">P5</text>
+<text data-port-function-for="A1:5" x="443.005" y="54" text-anchor="middle" dominant-baseline="middle" font-family="ui-sans-serif, system-ui, sans-serif" font-size="9.5" fill="#64748b">IGN_SENSE</text>
+<rect x="302.2" y="65" width="58.57" height="33" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.5" vector-effect="non-scaling-stroke"/>
+<circle data-port-id="A1:2" cx="302.2" cy="81.5" r="4" fill="#111827" stroke="#ffffff" stroke-width="1.5" vector-effect="non-scaling-stroke"/>
+<text data-port-label-for="A1:2" x="318.29" y="74.5" text-anchor="middle" dominant-baseline="middle" font-family="ui-sans-serif, system-ui, sans-serif" font-size="10.5" fill="#334155">P2</text>
+<text data-port-function-for="A1:2" x="320.465" y="89" text-anchor="middle" dominant-baseline="middle" font-family="ui-sans-serif, system-ui, sans-serif" font-size="9.5" fill="#64748b">GND</text>
+<rect x="408.21" y="135" width="69.59" height="33" fill="#f9fafb" stroke="#e5e7eb" stroke-width="0.5" vector-effect="non-scaling-stroke"/>
+<circle data-port-id="A1:6" cx="477.8" cy="151.5" r="4" fill="#111827" stroke="#ffffff" stroke-width="1.5" vector-effect="non-scaling-stroke"/>
+<text data-port-label-for="A1:6" x="461.71" y="144.5" text-anchor="middle" dominant-baseline="middle" font-family="ui-sans-serif, system-ui, sans-serif" font-size="10.5" fill="#334155">P6</text>
+<text data-port-function-for="A1:6" x="448.515" y="159" text-anchor="middle" dominant-baseline="middle" font-family="ui-sans-serif, system-ui, sans-serif" font-size="9.5" fill="#64748b">WAKE_IN</text>
+<rect x="302.2" y="100" width="58.57" height="33" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.5" vector-effect="non-scaling-stroke"/>
+<circle data-port-id="A1:3" cx="302.2" cy="116.5" r="4" fill="#111827" stroke="#ffffff" stroke-width="1.5" vector-effect="non-scaling-stroke"/>
+<text data-port-label-for="A1:3" x="318.29" y="109.5" text-anchor="middle" dominant-baseline="middle" font-family="ui-sans-serif, system-ui, sans-serif" font-size="10.5" fill="#334155">P3</text>
+<text data-port-function-for="A1:3" x="325.975" y="124" text-anchor="middle" dominant-baseline="middle" font-family="ui-sans-serif, system-ui, sans-serif" font-size="9.5" fill="#64748b">CAN_H</text>
+<rect x="302.2" y="135" width="58.57" height="33" fill="#f9fafb" stroke="#e5e7eb" stroke-width="0.5" vector-effect="non-scaling-stroke"/>
+<circle data-port-id="A1:4" cx="302.2" cy="151.5" r="4" fill="#111827" stroke="#ffffff" stroke-width="1.5" vector-effect="non-scaling-stroke"/>
+<text data-port-label-for="A1:4" x="318.29" y="144.5" text-anchor="middle" dominant-baseline="middle" font-family="ui-sans-serif, system-ui, sans-serif" font-size="10.5" fill="#334155">P4</text>
+<text data-port-function-for="A1:4" x="325.975" y="159" text-anchor="middle" dominant-baseline="middle" font-family="ui-sans-serif, system-ui, sans-serif" font-size="9.5" fill="#64748b">CAN_L</text>
+<text x="390" y="-19" text-anchor="middle" font-family="ui-sans-serif, system-ui, sans-serif" font-size="12.5" font-weight="650" fill="#111827">A1</text>
+<text x="390" y="1" text-anchor="middle" font-family="ui-sans-serif, system-ui, sans-serif" font-size="9.8" fill="#475569">OFFLINE CONTROL UNIT</text>
+</g>
+<g class="routecore-component" data-component-id="J1" role="graphics-symbol" aria-label="J1, connector, 6 connection points">
+<title>J1, connector, 6 connection points</title>
+
+<rect x="5" y="-25" width="150" height="290" rx="4" fill="#ffffff" stroke="#4b5563" stroke-width="1.5" vector-effect="non-scaling-stroke"/>
+<rect x="5" y="-25" width="150" height="38" rx="4" fill="#f3f4f6"/>
+<rect x="107.45" y="35" width="47.55" height="33" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.5" vector-effect="non-scaling-stroke"/>
+<circle data-port-id="J1:1" cx="155" cy="51.5" r="4" fill="#111827" stroke="#ffffff" stroke-width="1.5" vector-effect="non-scaling-stroke"/>
+<text data-port-label-for="J1:1" x="141.955" y="44.5" text-anchor="middle" dominant-baseline="middle" font-family="ui-sans-serif, system-ui, sans-serif" font-size="10.5" fill="#334155">1</text>
+<text data-port-function-for="J1:1" x="133.98" y="59" text-anchor="middle" dominant-baseline="middle" font-family="ui-sans-serif, system-ui, sans-serif" font-size="9.5" fill="#64748b">VBAT</text>
+<rect x="107.45" y="70" width="47.55" height="33" fill="#f9fafb" stroke="#e5e7eb" stroke-width="0.5" vector-effect="non-scaling-stroke"/>
+<circle data-port-id="J1:2" cx="155" cy="86.5" r="4" fill="#111827" stroke="#ffffff" stroke-width="1.5" vector-effect="non-scaling-stroke"/>
+<text data-port-label-for="J1:2" x="141.955" y="79.5" text-anchor="middle" dominant-baseline="middle" font-family="ui-sans-serif, system-ui, sans-serif" font-size="10.5" fill="#334155">2</text>
+<text data-port-function-for="J1:2" x="136.735" y="94" text-anchor="middle" dominant-baseline="middle" font-family="ui-sans-serif, system-ui, sans-serif" font-size="9.5" fill="#64748b">GND</text>
+<rect x="107.45" y="105" width="47.55" height="33" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.5" vector-effect="non-scaling-stroke"/>
+<circle data-port-id="J1:3" cx="155" cy="121.5" r="4" fill="#111827" stroke="#ffffff" stroke-width="1.5" vector-effect="non-scaling-stroke"/>
+<text data-port-label-for="J1:3" x="141.955" y="114.5" text-anchor="middle" dominant-baseline="middle" font-family="ui-sans-serif, system-ui, sans-serif" font-size="10.5" fill="#334155">3</text>
+<text data-port-function-for="J1:3" x="131.225" y="129" text-anchor="middle" dominant-baseline="middle" font-family="ui-sans-serif, system-ui, sans-serif" font-size="9.5" fill="#64748b">CAN_H</text>
+<rect x="107.45" y="140" width="47.55" height="33" fill="#f9fafb" stroke="#e5e7eb" stroke-width="0.5" vector-effect="non-scaling-stroke"/>
+<circle data-port-id="J1:4" cx="155" cy="156.5" r="4" fill="#111827" stroke="#ffffff" stroke-width="1.5" vector-effect="non-scaling-stroke"/>
+<text data-port-label-for="J1:4" x="141.955" y="149.5" text-anchor="middle" dominant-baseline="middle" font-family="ui-sans-serif, system-ui, sans-serif" font-size="10.5" fill="#334155">4</text>
+<text data-port-function-for="J1:4" x="131.225" y="164" text-anchor="middle" dominant-baseline="middle" font-family="ui-sans-serif, system-ui, sans-serif" font-size="9.5" fill="#64748b">CAN_L</text>
+<rect x="107.45" y="175" width="47.55" height="33" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.5" vector-effect="non-scaling-stroke"/>
+<circle data-port-id="J1:5" cx="155" cy="191.5" r="4" fill="#111827" stroke="#ffffff" stroke-width="1.5" vector-effect="non-scaling-stroke"/>
+<text data-port-label-for="J1:5" x="141.955" y="184.5" text-anchor="middle" dominant-baseline="middle" font-family="ui-sans-serif, system-ui, sans-serif" font-size="10.5" fill="#334155">5</text>
+<text data-port-function-for="J1:5" x="136.735" y="199" text-anchor="middle" dominant-baseline="middle" font-family="ui-sans-serif, system-ui, sans-serif" font-size="9.5" fill="#64748b">IGN</text>
+<rect x="107.45" y="210" width="47.55" height="33" fill="#f9fafb" stroke="#e5e7eb" stroke-width="0.5" vector-effect="non-scaling-stroke"/>
+<circle data-port-id="J1:6" cx="155" cy="226.5" r="4" fill="#111827" stroke="#ffffff" stroke-width="1.5" vector-effect="non-scaling-stroke"/>
+<text data-port-label-for="J1:6" x="141.955" y="219.5" text-anchor="middle" dominant-baseline="middle" font-family="ui-sans-serif, system-ui, sans-serif" font-size="10.5" fill="#334155">6</text>
+<text data-port-function-for="J1:6" x="133.98" y="234" text-anchor="middle" dominant-baseline="middle" font-family="ui-sans-serif, system-ui, sans-serif" font-size="9.5" fill="#64748b">WAKE</text>
+<text x="80" y="-14" text-anchor="middle" font-family="ui-sans-serif, system-ui, sans-serif" font-size="12.5" font-weight="650" fill="#111827">J1</text>
+<text x="80" y="6" text-anchor="middle" font-family="ui-sans-serif, system-ui, sans-serif" font-size="9.8" fill="#475569">POWER / CAN</text>
+</g>
+<g class="routecore-component" data-component-id="J2" role="graphics-symbol" aria-label="J2, connector, 3 connection points">
+<title>J2, connector, 3 connection points</title>
+
+<rect x="667.5" y="75" width="185" height="150" rx="4" fill="#ffffff" stroke="#4b5563" stroke-width="1.5" vector-effect="non-scaling-stroke"/>
+<rect x="814.5" y="75" width="38" height="150" rx="4" fill="#f3f4f6"/>
+<rect x="759.5" y="75" width="33" height="42.04" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.5" vector-effect="non-scaling-stroke"/>
+<circle data-port-id="J2:1" cx="776" cy="75" r="4" fill="#111827" stroke="#ffffff" stroke-width="1.5" vector-effect="non-scaling-stroke"/>
+<text data-port-label-for="J2:1" x="783" y="88.045" text-anchor="middle" dominant-baseline="middle" font-family="ui-sans-serif, system-ui, sans-serif" font-size="10.5" fill="#334155">1</text>
+<text data-port-function-for="J2:1" x="768.5" y="93.265" text-anchor="middle" dominant-baseline="middle" font-family="ui-sans-serif, system-ui, sans-serif" font-size="9.5" fill="#64748b">IGN</text>
+<rect x="724.5" y="75" width="33" height="42.04" fill="#f9fafb" stroke="#e5e7eb" stroke-width="0.5" vector-effect="non-scaling-stroke"/>
+<circle data-port-id="J2:2" cx="741" cy="75" r="4" fill="#111827" stroke="#ffffff" stroke-width="1.5" vector-effect="non-scaling-stroke"/>
+<text data-port-label-for="J2:2" x="748" y="88.045" text-anchor="middle" dominant-baseline="middle" font-family="ui-sans-serif, system-ui, sans-serif" font-size="10.5" fill="#334155">2</text>
+<text data-port-function-for="J2:2" x="733.5" y="96.02" text-anchor="middle" dominant-baseline="middle" font-family="ui-sans-serif, system-ui, sans-serif" font-size="9.5" fill="#64748b">WAKE</text>
+<rect x="689.5" y="75" width="33" height="42.04" fill="#ffffff" stroke="#e5e7eb" stroke-width="0.5" vector-effect="non-scaling-stroke"/>
+<circle data-port-id="J2:3" cx="706" cy="75" r="4" fill="#111827" stroke="#ffffff" stroke-width="1.5" vector-effect="non-scaling-stroke"/>
+<text data-port-label-for="J2:3" x="713" y="88.045" text-anchor="middle" dominant-baseline="middle" font-family="ui-sans-serif, system-ui, sans-serif" font-size="10.5" fill="#334155">3</text>
+<text data-port-function-for="J2:3" x="698.5" y="93.265" text-anchor="middle" dominant-baseline="middle" font-family="ui-sans-serif, system-ui, sans-serif" font-size="9.5" fill="#64748b">GND</text>
+<text x="838.5" y="147" transform="rotate(90 838.5 147)" text-anchor="middle" font-family="ui-sans-serif, system-ui, sans-serif" font-size="12.5" font-weight="650" fill="#111827">J2</text>
+<text x="825.5" y="154" transform="rotate(90 825.5 154)" text-anchor="middle" font-family="ui-sans-serif, system-ui, sans-serif" font-size="9.8" fill="#475569">SERVICE HEADER</text>
+</g></g>
+<g id="routecore-label-layer"><g class="routecore-label" data-label-id="L-J1" role="graphics-symbol" aria-label="SOURCE CONNECTOR">
+<line x1="86" y1="-25" x2="86" y2="-45" stroke="#667085" stroke-width="1" stroke-dasharray="3 3" vector-effect="non-scaling-stroke"/>
+<rect x="26.32" y="-55" width="119.36" height="20" rx="3" fill="#ffffff" stroke="#cfd5dd" stroke-width="1" vector-effect="non-scaling-stroke"/>
+<text x="86" y="-41" text-anchor="middle" font-family="ui-sans-serif, system-ui, sans-serif" font-size="12" font-weight="400" fill="#111827">SOURCE CONNECTOR</text>
+
+</g>
+<g class="routecore-label" data-label-id="L-A1" role="graphics-symbol" aria-label="CONTROL UNIT">
+<line x1="390" y1="-30" x2="390" y2="-50" stroke="#667085" stroke-width="1" stroke-dasharray="3 3" vector-effect="non-scaling-stroke"/>
+<rect x="344.24" y="-60" width="91.52" height="20" rx="3" fill="#ffffff" stroke="#cfd5dd" stroke-width="1" vector-effect="non-scaling-stroke"/>
+<text x="390" y="-46" text-anchor="middle" font-family="ui-sans-serif, system-ui, sans-serif" font-size="12" font-weight="400" fill="#111827">CONTROL UNIT</text>
+
+</g>
+<g class="routecore-label" data-label-id="L-J2" role="graphics-symbol" aria-label="SERVICE">
+<line x1="852.5" y1="144" x2="890.86" y2="144" stroke="#667085" stroke-width="1" stroke-dasharray="3 3" vector-effect="non-scaling-stroke"/>
+<rect x="862.5" y="134" width="56.72" height="20" rx="3" fill="#ffffff" stroke="#cfd5dd" stroke-width="1" vector-effect="non-scaling-stroke"/>
+<text x="890.86" y="148" text-anchor="middle" font-family="ui-sans-serif, system-ui, sans-serif" font-size="12" font-weight="400" fill="#111827">SERVICE</text>
+
+</g>
+<g class="routecore-label" data-label-id="L-W3" role="graphics-symbol" aria-label="CAN TWISTED PAIR">
+<line x1="228.6" y1="119" x2="228.6" y2="139" stroke="#667085" stroke-width="1" stroke-dasharray="3 3" vector-effect="non-scaling-stroke"/>
+<rect x="178.2" y="129" width="100.8" height="20" rx="3" fill="#ffffff" stroke="#cfd5dd" stroke-width="1" vector-effect="non-scaling-stroke"/>
+<text x="228.6" y="141" text-anchor="middle" font-family="ui-sans-serif, system-ui, sans-serif" font-size="10" font-weight="400" fill="#111827">CAN TWISTED PAIR</text>
+
+</g>
+<g class="routecore-label" data-label-id="L-W6" role="graphics-symbol" aria-label="SHIELDED WAKE">
+<line x1="571.15" y1="47" x2="571.15" y2="67" stroke="#667085" stroke-width="1" stroke-dasharray="3 3" vector-effect="non-scaling-stroke"/>
+<rect x="529.45" y="57" width="83.4" height="20" rx="3" fill="#ffffff" stroke="#cfd5dd" stroke-width="1" vector-effect="non-scaling-stroke"/>
+<text x="571.15" y="69" text-anchor="middle" font-family="ui-sans-serif, system-ui, sans-serif" font-size="10" font-weight="400" fill="#111827">SHIELDED WAKE</text>
+
+</g></g>
+<g id="routecore-interaction-layer" pointer-events="none"></g>
+<g id="routecore-handle-layer"></g>
+</svg>

@@ -1,0 +1,10 @@
+{
+  "application": "RouteCore Offline Studio",
+  "version": "0.4.0",
+  "builtAt": "2026-08-26T18:29:12.922Z",
+  "node": "v22.16.0",
+  "editorCoreFiles": 104,
+  "frontendFiles": 14,
+  "runtimeNetworkPolicy": "loopback-only",
+  "externalRuntimeDependencies": 0
+}

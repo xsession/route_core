@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-137.69 -126 475.38 656" width="100%" height="100%" preserveAspectRatio="xMidYMid meet" role="graphics-document" aria-label="Harness visual editor canvas" data-routecore-schema="1">
+<title>Harness visual editor</title>
+<desc>Offline cable and wiring-harness editor scene with components, ports, wires, labels, and routing handles.</desc>
+<defs>
+<pattern id="routecore-grid-minor" width="10" height="10" patternUnits="userSpaceOnUse"><path d="M 10 0 L 0 0 0 10" fill="none" stroke="#2d333b" stroke-width="0.6" opacity="0.32" vector-effect="non-scaling-stroke"/></pattern>
+<pattern id="routecore-grid-major" width="50" height="50" patternUnits="userSpaceOnUse"><rect width="50" height="50" fill="url(#routecore-grid-minor)"/><path d="M 50 0 L 0 0 0 50" fill="none" stroke="#3a424c" stroke-width="1" opacity="0.32" vector-effect="non-scaling-stroke"/></pattern>
+</defs>
+<rect x="-137.69" y="-126" width="475.38" height="656" fill="#20242a"/>
+<g id="routecore-grid-layer" pointer-events="none"><rect x="-137.69" y="-126" width="475.38" height="656" fill="url(#routecore-grid-major)"/></g>
+<g id="routecore-wire-layer"></g>
+<g id="routecore-crossing-layer" pointer-events="none"></g>
+<g id="routecore-component-layer"><g class="routecore-component" data-component-id="MIXED" role="graphics-symbol" aria-label="J?, connector, 7 connection points">
+<title>J?, connector, 7 connection points</title>
+
+<rect x="-45.69" y="-34" width="291.38" height="228" rx="5" fill="#f8fafc" stroke="#475569" stroke-width="1.5" vector-effect="non-scaling-stroke"/>
+<rect x="-45.69" y="5" width="291.38" height="38" rx="5" fill="#e2e8f0"/>
+<rect x="-45.69" y="65" width="119.18" height="33" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.5" vector-effect="non-scaling-stroke"/>
+<circle data-port-id="w1" cx="-45.69" cy="81.5" r="4" fill="#111827" stroke="#ffffff" stroke-width="1.5" vector-effect="non-scaling-stroke"/>
+<text data-port-label-for="w1" x="-32.645" y="74.5" text-anchor="middle" dominant-baseline="middle" font-family="ui-sans-serif, system-ui, sans-serif" font-size="10.5" fill="#111827">1</text>
+<text data-port-function-for="w1" x="13.9" y="89" text-anchor="middle" dominant-baseline="middle" font-family="ui-sans-serif, system-ui, sans-serif" font-size="9.5" fill="#475569">SIGNAL_OUTPUT_LONG</text>
+<rect x="137.53" y="65" width="108.16" height="33" fill="#f8fafc" stroke="#e2e8f0" stroke-width="0.5" vector-effect="non-scaling-stroke"/>
+<circle data-port-id="e1" cx="245.69" cy="81.5" r="4" fill="#111827" stroke="#ffffff" stroke-width="1.5" vector-effect="non-scaling-stroke"/>
+<text data-port-label-for="e1" x="232.645" y="74.5" text-anchor="middle" dominant-baseline="middle" font-family="ui-sans-serif, system-ui, sans-serif" font-size="10.5" fill="#111827">3</text>
+<text data-port-function-for="e1" x="194.365" y="89" text-anchor="middle" dominant-baseline="middle" font-family="ui-sans-serif, system-ui, sans-serif" font-size="9.5" fill="#475569">EAST_INPUT_LONG</text>
+<rect x="42.41" y="-34" width="115.18" height="39" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.5" vector-effect="non-scaling-stroke"/>
+<circle data-port-id="n1" cx="100" cy="-34" r="4" fill="#111827" stroke="#ffffff" stroke-width="1.5" vector-effect="non-scaling-stroke"/>
+<text data-port-label-for="n1" x="100" y="-21.5" text-anchor="middle" dominant-baseline="middle" font-family="ui-sans-serif, system-ui, sans-serif" font-size="10.5" fill="#111827">2</text>
+<text data-port-function-for="n1" x="100" y="-7" text-anchor="middle" dominant-baseline="middle" font-family="ui-sans-serif, system-ui, sans-serif" font-size="9.5" fill="#475569">NORTH_CONTROL_LONG</text>
+<rect x="-21.69" y="155" width="109.67" height="39" fill="#f8fafc" stroke="#e2e8f0" stroke-width="0.5" vector-effect="non-scaling-stroke"/>
+<circle data-port-id="s1" cx="33.145" cy="194" r="4" fill="#111827" stroke="#ffffff" stroke-width="1.5" vector-effect="non-scaling-stroke"/>
+<text data-port-label-for="s1" x="33.145" y="167.5" text-anchor="middle" dominant-baseline="middle" font-family="ui-sans-serif, system-ui, sans-serif" font-size="10.5" fill="#111827">5</text>
+<text data-port-function-for="s1" x="33.145" y="182" text-anchor="middle" dominant-baseline="middle" font-family="ui-sans-serif, system-ui, sans-serif" font-size="9.5" fill="#475569">SOUTH_ENABLE_LONG</text>
+<rect x="-45.69" y="100" width="119.18" height="33" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.5" vector-effect="non-scaling-stroke"/>
+<circle data-port-id="w2" cx="-45.69" cy="116.5" r="4" fill="#111827" stroke="#ffffff" stroke-width="1.5" vector-effect="non-scaling-stroke"/>
+<text data-port-label-for="w2" x="-32.645" y="109.5" text-anchor="middle" dominant-baseline="middle" font-family="ui-sans-serif, system-ui, sans-serif" font-size="10.5" fill="#111827">7</text>
+<text data-port-function-for="w2" x="8.39" y="124" text-anchor="middle" dominant-baseline="middle" font-family="ui-sans-serif, system-ui, sans-serif" font-size="9.5" fill="#475569">SECOND_WEST_LONG</text>
+<rect x="137.53" y="100" width="108.16" height="33" fill="#f8fafc" stroke="#e2e8f0" stroke-width="0.5" vector-effect="non-scaling-stroke"/>
+<circle data-port-id="e2" cx="245.69" cy="116.5" r="4" fill="#111827" stroke="#ffffff" stroke-width="1.5" vector-effect="non-scaling-stroke"/>
+<text data-port-label-for="e2" x="232.645" y="109.5" text-anchor="middle" dominant-baseline="middle" font-family="ui-sans-serif, system-ui, sans-serif" font-size="10.5" fill="#111827">4</text>
+<text data-port-function-for="e2" x="191.61" y="124" text-anchor="middle" dominant-baseline="middle" font-family="ui-sans-serif, system-ui, sans-serif" font-size="9.5" fill="#475569">EAST_RETURN_LONG</text>
+<rect x="89.98" y="155" width="131.71" height="39" fill="#ffffff" stroke="#e2e8f0" stroke-width="0.5" vector-effect="non-scaling-stroke"/>
+<circle data-port-id="s2" cx="155.835" cy="194" r="4" fill="#111827" stroke="#ffffff" stroke-width="1.5" vector-effect="non-scaling-stroke"/>
+<text data-port-label-for="s2" x="155.835" y="167.5" text-anchor="middle" dominant-baseline="middle" font-family="ui-sans-serif, system-ui, sans-serif" font-size="10.5" fill="#111827">6</text>
+<text data-port-function-for="s2" x="155.835" y="182" text-anchor="middle" dominant-baseline="middle" font-family="ui-sans-serif, system-ui, sans-serif" font-size="9.5" fill="#475569">SOUTH_DIAGNOSTIC_LONG</text>
+<text x="100" y="16" text-anchor="middle" font-family="ui-sans-serif, system-ui, sans-serif" font-size="12.5" font-weight="650" fill="#0f172a">Custom Connector</text>
+<text x="100" y="36" text-anchor="middle" font-family="ui-sans-serif, system-ui, sans-serif" font-size="9.8" fill="#475569">CUSTOM</text>
+</g></g>
+<g id="routecore-label-layer"><g class="routecore-label" data-label-id="demo" role="graphics-symbol" aria-label="AUTO CONTRAST LABEL">
+
+<rect x="29.88" y="430" width="140.24" height="20" rx="3" fill="#f8fafc" stroke="#64748b" stroke-width="1" vector-effect="non-scaling-stroke"/>
+<text x="100" y="444" text-anchor="middle" font-family="ui-sans-serif, system-ui, sans-serif" font-size="12" font-weight="600" fill="#111827">AUTO CONTRAST LABEL</text>
+
+</g></g>
+<g id="routecore-interaction-layer" pointer-events="none"></g>
+<g id="routecore-handle-layer"></g>
+</svg>

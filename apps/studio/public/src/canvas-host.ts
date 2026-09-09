@@ -8,6 +8,7 @@ import {
   renderEditorSvg,
   viewportWorldRect,
   type EditorDocument,
+  type DrawingElement,
   type EditorPointerEvent,
   type HitResult,
   type Point,
@@ -47,6 +48,7 @@ export class CanvasHost {
   private interaction: EditorInteractionController;
   private viewportValue: ViewportController;
   private overlay: SvgInteractionOverlay = EMPTY_OVERLAY;
+  private drawingElements: DrawingElement[] = [];
   private toolValue: EditorTool = 'select';
   private dark = true;
   private pointerCapture: number | null = null;
@@ -147,6 +149,11 @@ export class CanvasHost {
 
   public setShowDiagnostics(value: boolean): void {
     this.showDiagnostics = value;
+    this.render();
+  }
+
+  public setDrawingElements(elements: readonly DrawingElement[] = []): void {
+    this.drawingElements = elements.map((element) => structuredClone(element));
     this.render();
   }
 
@@ -290,6 +297,7 @@ export class CanvasHost {
       theme: this.dark ? DEFAULT_DARK_THEME : DEFAULT_LIGHT_THEME,
       options,
       overlay: this.overlay,
+      drawingElements: this.drawingElements,
     });
     this.shell.style.background = this.dark ? DEFAULT_DARK_THEME.background : DEFAULT_LIGHT_THEME.background;
     this.emptyState.hidden = document.componentOrder.length > 0 || document.wireOrder.length > 0 || document.labelOrder.length > 0;

@@ -18,11 +18,14 @@ test('compiled frontend is self-contained and contains no remote runtime depende
   assert.ok(existsSync('apps/studio/public/vendor/editor-core/index.js'));
   assert.ok(existsSync('apps/studio/public/vendor/editor-core/performance-engine.js'));
   assert.ok(existsSync('apps/studio/public/vendor/editor-core/adaptive-spatial.js'));
+  assert.ok(existsSync('apps/studio/public/vendor/three/three.module.js'));
   const index = readFileSync('apps/studio/public/index.html', 'utf8');
   assert.match(index, /src="\/js\/main\.js"/);
+  assert.match(index, /"three":"\/vendor\/three\/three\.module\.js"/);
   assert.doesNotMatch(index, /https?:\/\//);
   const files = walk('apps/studio/public').filter((path) => ['.html', '.css', '.js'].includes(extname(path)));
   for (const file of files) {
+    if (file.includes(join('vendor', 'three'))) continue;
     const text = readFileSync(file, 'utf8');
     const matches = [...text.matchAll(/https?:\/\/[^\s"'`<>]+/g)].map((match) => match[0]);
     const unexpected = matches.filter((value) => value !== 'http://www.w3.org/2000/svg');

@@ -10,11 +10,18 @@
     "start:no-open": "node apps/studio/server/main.mjs",
     "test": "node --test tests/*.test.mjs && npm --prefix references/editor-core run test:base && npm --prefix references/editor-core run test:advanced && npm --prefix packages/harness-editor-core test",
     "check": "npm run build && npm test",
+    "benchmark:editor": "npm run build && node scripts/benchmark-editor.mjs",
     "demo:project": "node scripts/create-demo-project.mjs",
     "package": "node scripts/package.mjs"
   },
   "engines": {
     "node": ">=22.5"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "dependencies": {
+    "three": "^0.186.0"
+  },
+  "devDependencies": {
+    "@types/three": "^0.185.4"
+  }
 }

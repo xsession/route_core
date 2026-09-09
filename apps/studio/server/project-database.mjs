@@ -655,6 +655,7 @@ export class ProjectDatabase {
       },
       editor: document,
       bom: this.listBomItems(document.modelId),
+      drawingElements: this.listDrawingElements(document.modelId, document.pageId),
       revisions: this.listRevisions(document.modelId),
     };
   }
@@ -1403,12 +1404,346 @@ export class ProjectDatabase {
         );
       }
       this.createRecoverySnapshot(assemblyId, layoutPageId, 'layout', generated.document, null);
+      const sheetId = this.ensureLayoutSheet(assemblyId, layoutPageId, name, now);
+      this.insertDefaultDrawingElements(sheetId, name);
       this.database.exec('COMMIT');
       return this.getWorkspace();
     } catch (error) {
       this.database.exec('ROLLBACK');
       throw error;
     }
+  }
+
+  ensureLayoutSheet(modelId, pageId, name = 'Assembly Drawing', now = nowIso()) {
+    const page = this.database.prepare(`
+      SELECT id, name, width_um, height_um, orientation FROM canvas_page
+      WHERE id = ? AND model_id = ? AND view_kind = 'layout'
+    `).get(pageId, modelId);
+    if (!page) throw new Error('Drawing elements require a layout page in the selected model.');
+    let layout = this.database.prepare('SELECT id FROM layout_document WHERE model_id = ? ORDER BY created_at LIMIT 1').get(modelId);
+    if (!layout) {
+      layout = { id: createId('layout-document') };
+      this.database.prepare(`
+        INSERT INTO layout_document(id, model_id, name, status, properties_json, created_at, modified_at)
+        VALUES (?, ?, ?, 'draft', '{}', ?, ?)
+      `).run(layout.id, modelId, name, now, now);
+    }
+    let sheet = this.database.prepare(`
+      SELECT id FROM layout_sheet WHERE document_id = ? AND json_extract(properties_json, '$.pageId') = ?
+    `).get(layout.id, pageId);
+    if (!sheet) {
+      sheet = { id: createId('layout-sheet') };
+      const order = Number(this.database.prepare('SELECT count(*) AS count FROM layout_sheet WHERE document_id = ?').get(layout.id).count);
+      this.database.prepare(`
+        INSERT INTO layout_sheet(
+          id, document_id, sheet_order, name, paper_size, orientation,
+          width_um, height_um, properties_json
+        ) VALUES (?, ?, ?, ?, 'A3', ?, ?, ?, ?)
+      `).run(sheet.id, layout.id, order, page.name, page.orientation || 'landscape', page.width_um || 1189000, page.height_um || 841000, JSON.stringify({ pageId }));
+    }
+    return sheet.id;
+  }
+
+  insertDefaultDrawingElements(sheetId, title = 'Assembly Drawing') {
+    const statement = this.database.prepare(`
+      INSERT INTO layout_element(
+        id, sheet_id, element_kind, x_lu, y_lu, width_lu, height_lu,
+        rotation_udeg, z_order, locked, query_json, style_json, content_json
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, 0, ?, '{}', ?)
+    `);
+    statement.run(createId('drawing'), sheetId, 'title_block', 650, 610, 330, 95, 10, '{}', JSON.stringify({ title, text: 'Draft · Live project data' }));
+    statement.run(createId('drawing'), sheetId, 'bom_table', 650, 60, 330, 240, 5, JSON.stringify({ source: 'bom' }), JSON.stringify({ title: 'BILL OF MATERIALS' }));
+    statement.run(createId('drawing'), sheetId, 'wire_schedule', 650, 320, 330, 260, 6, JSON.stringify({ source: 'wires' }), JSON.stringify({ title: 'WIRE SCHEDULE' }));
+  }
+
+  listDrawingElements(modelId = null, pageId = null) {
+    const workspace = this.getWorkspaceState();
+    const selectedModelId = modelId || workspace.activeModelId;
+    const selectedPageId = pageId || workspace.activePageId;
+    if (!selectedModelId || !selectedPageId) return [];
+    const rows = this.database.prepare(`
+      SELECT e.* FROM layout_element e
+      JOIN layout_sheet s ON s.id = e.sheet_id
+      JOIN layout_document d ON d.id = s.document_id
+      WHERE d.model_id = ? AND json_extract(s.properties_json, '$.pageId') = ?
+      ORDER BY e.z_order, e.id
+    `).all(selectedModelId, selectedPageId);
+    const editor = rows.length ? this.loadEditorDocument({ modelId: selectedModelId, pageId: selectedPageId, viewKind: 'layout' }).document : null;
+    const model = this.database.prepare('SELECT name, designator, lifecycle_state FROM design_model WHERE id = ?').get(selectedModelId);
+    const revision = this.database.prepare('SELECT revision_name FROM revision WHERE model_id = ? ORDER BY created_at DESC LIMIT 1').get(selectedModelId);
+    return rows.map((row) => {
+      const query = JSON.parse(row.query_json);
+      const content = JSON.parse(row.content_json);
+      if (row.element_kind === 'bom_table') {
+        content.columns = ['PART', 'DESCRIPTION', 'QTY'];
+        content.rows = this.listBomItems(selectedModelId).map((item) => [item.partNumber || '—', item.description || item.entityId, `${item.quantity} ${item.unit}`]);
+      } else if (row.element_kind === 'wire_schedule' && editor) {
+        content.columns = ['WIRE', 'SIGNAL', 'FROM', 'TO'];
+        content.rows = editor.wireOrder.map((id) => {
+          const wire = editor.wires[id];
+          const endpoint = (value) => value.kind === 'port' ? `${editor.components[value.componentId]?.designator || value.componentId}.${editor.components[value.componentId]?.ports.find((port) => port.id === value.portId)?.label || value.portId}` : value.kind;
+          return [wire.label || id, wire.signal || '—', endpoint(wire.source), endpoint(wire.target)];
+        });
+      } else if (row.element_kind === 'title_block') {
+        content.title = content.title || model?.name || 'ASSEMBLY DRAWING';
+        content.text = `${model?.designator || 'ASSEMBLY'} · ${model?.lifecycle_state || 'draft'} · ${revision?.revision_name || 'unrevisioned'}`;
+      } else if (row.element_kind === 'dimension' && editor && query.fromEntityId && query.toEntityId) {
+        const from = editor.components[query.fromEntityId]?.position;
+        const to = editor.components[query.toEntityId]?.position;
+        if (from && to) content.value = `${Math.hypot(to.x - from.x, to.y - from.y).toFixed(1)} mm`;
+      }
+      return {
+        id: row.id,
+        kind: ({ title_block: 'title-block', bom_table: 'bom-table', wire_schedule: 'wire-schedule', note: 'leader-note' })[row.element_kind] || row.element_kind,
+        x: row.x_lu,
+        y: row.y_lu,
+        width: row.width_lu,
+        height: row.height_lu,
+        rotation: row.rotation_udeg / 1000000,
+        locked: Boolean(row.locked),
+        query,
+        style: JSON.parse(row.style_json),
+        content,
+      };
+    });
+  }
+
+  saveDrawingElement(input = {}) {
+    const modelId = input.modelId || this.getWorkspaceState().activeModelId;
+    const pageId = input.pageId || this.getWorkspaceState().activePageId;
+    const model = this.database.prepare(`
+      SELECT m.name FROM design_model m JOIN canvas_page p ON p.model_id = m.id
+      WHERE m.id = ? AND p.id = ? AND p.view_kind = 'layout'
+    `).get(modelId, pageId);
+    if (!model) throw new Error('Select a layout page before adding drawing content.');
+    const sheetId = this.ensureLayoutSheet(modelId, pageId, model.name);
+    const kind = ({ 'title-block': 'title_block', 'bom-table': 'bom_table', 'wire-schedule': 'wire_schedule', 'leader-note': 'note' })[input.kind] || input.kind;
+    const allowed = new Set(['dimension', 'note', 'title_block', 'bom_table', 'wire_schedule']);
+    if (!allowed.has(kind)) throw new Error(`Unsupported drawing element kind: ${String(input.kind)}`);
+    const id = input.id || createId('drawing');
+    const zOrder = Number.isFinite(Number(input.zOrder)) ? Number(input.zOrder) : Number(this.database.prepare('SELECT coalesce(max(z_order), 0) + 1 AS value FROM layout_element WHERE sheet_id = ?').get(sheetId).value);
+    this.database.prepare(`
+      INSERT INTO layout_element(
+        id, sheet_id, element_kind, x_lu, y_lu, width_lu, height_lu,
+        rotation_udeg, z_order, locked, query_json, style_json, content_json
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(id) DO UPDATE SET
+        element_kind = excluded.element_kind, x_lu = excluded.x_lu, y_lu = excluded.y_lu,
+        width_lu = excluded.width_lu, height_lu = excluded.height_lu,
+        rotation_udeg = excluded.rotation_udeg, z_order = excluded.z_order,
+        locked = excluded.locked, query_json = excluded.query_json,
+        style_json = excluded.style_json, content_json = excluded.content_json
+    `).run(
+      id, sheetId, kind, lu(input.x ?? 80), lu(input.y ?? 80), Math.max(20, lu(input.width ?? 220)),
+      Math.max(16, lu(input.height ?? 60)), lu(Number(input.rotation || 0) * 1000000), zOrder,
+      booleanInteger(input.locked), JSON.stringify(input.query || {}), JSON.stringify(input.style || {}), JSON.stringify(input.content || {}),
+    );
+    return this.listDrawingElements(modelId, pageId).find((element) => element.id === id);
+  }
+
+  deleteDrawingElement(id) {
+    return this.database.prepare('DELETE FROM layout_element WHERE id = ?').run(id).changes > 0;
+  }
+
+  previewAssemblySync(assemblyModelId = null) {
+    const selectedAssemblyId = assemblyModelId || this.getWorkspaceState().activeModelId;
+    const assemblyModel = this.database.prepare(`SELECT id, kind, extra_json FROM design_model WHERE id = ?`).get(selectedAssemblyId);
+    if (!assemblyModel || assemblyModel.kind !== 'assembly') throw new Error('Select an assembly before reviewing synchronization.');
+    const mappings = this.database.prepare(`SELECT * FROM assembly_origin_mapping WHERE assembly_model_id = ? ORDER BY origin_entity_kind, origin_entity_id`).all(selectedAssemblyId);
+    const extra = JSON.parse(assemblyModel.extra_json || '{}');
+    const originModelId = mappings[0]?.origin_model_id || extra.sourceModelId;
+    if (!originModelId) throw new Error('This assembly has no linked project plan.');
+    const origin = this.loadEditorDocument({ modelId: originModelId, viewKind: 'layout' });
+    const assembly = this.loadEditorDocument({ modelId: selectedAssemblyId, viewKind: 'layout' });
+    const mappingByOrigin = new Map(mappings.map((row) => [`${row.origin_entity_kind}:${row.origin_entity_id}`, row]));
+    const details = [];
+    const sourceEntities = [
+      ...origin.document.componentOrder.map((id) => ({ kind: 'component', id, value: origin.document.components[id] })),
+      ...origin.document.wireOrder.map((id) => ({ kind: 'conductor', id, value: origin.document.wires[id] })),
+    ];
+    for (const entity of sourceEntities) {
+      const mapping = mappingByOrigin.get(`${entity.kind}:${entity.id}`);
+      if (!mapping) {
+        details.push({ state: 'added', entityKind: entity.kind, originEntityId: entity.id, assemblyEntityId: null, explanation: 'Exists in the project plan but has not been generated into this assembly.' });
+        continue;
+      }
+      const assemblyValue = entity.kind === 'component' ? assembly.document.components[mapping.assembly_entity_id] : assembly.document.wires[mapping.assembly_entity_id];
+      if (!assemblyValue) {
+        details.push({ state: 'conflicted', entityKind: entity.kind, originEntityId: entity.id, assemblyEntityId: mapping.assembly_entity_id, explanation: 'The linked assembly entity was deleted or cannot be resolved.' });
+        continue;
+      }
+      const currentHash = sha256(JSON.stringify(entity.value));
+      if (currentHash !== mapping.last_synced_content_hash) {
+        details.push({ state: 'changed', entityKind: entity.kind, originEntityId: entity.id, assemblyEntityId: mapping.assembly_entity_id, explanation: 'Plan-owned electrical identity or connectivity changed since the last synchronization.' });
+      }
+    }
+    for (const mapping of mappings) {
+      const originValue = mapping.origin_entity_kind === 'component' ? origin.document.components[mapping.origin_entity_id] : origin.document.wires[mapping.origin_entity_id];
+      if (!originValue) details.push({ state: 'detached', entityKind: mapping.origin_entity_kind, originEntityId: mapping.origin_entity_id, assemblyEntityId: mapping.assembly_entity_id, explanation: 'The plan entity was removed; the assembly entity will be retained as detached.' });
+    }
+    const counts = { added: 0, changed: 0, detached: 0, conflicted: 0 };
+    for (const detail of details) counts[detail.state] += 1;
+    const toRevisionId = this.database.prepare('SELECT id FROM revision WHERE model_id = ? ORDER BY created_at DESC LIMIT 1').get(originModelId)?.id || origin.contentHash;
+    const fromRevisionId = mappings.find((row) => row.origin_revision_id)?.origin_revision_id || null;
+    const summary = { assemblyModelId: selectedAssemblyId, originModelId, originPageId: origin.pageId, counts, details };
+    const previewHash = sha256(JSON.stringify(summary));
+    const existing = this.database.prepare(`SELECT id FROM assembly_sync_record WHERE assembly_model_id = ? AND preview_hash = ? AND state = 'preview' ORDER BY created_at DESC LIMIT 1`).get(selectedAssemblyId, previewHash);
+    const syncRecordId = existing?.id || createId('assembly-sync');
+    if (!existing) this.database.prepare(`
+      INSERT INTO assembly_sync_record(
+        id, assembly_model_id, from_origin_revision_id, to_origin_revision_id,
+        preview_hash, state, summary_json, created_at
+      ) VALUES (?, ?, ?, ?, ?, 'preview', ?, ?)
+    `).run(syncRecordId, selectedAssemblyId, fromRevisionId, toRevisionId, previewHash, JSON.stringify(summary), nowIso());
+    return { id: syncRecordId, previewHash, ...summary };
+  }
+
+  applyAssemblySync(syncRecordId) {
+    const record = this.database.prepare(`SELECT * FROM assembly_sync_record WHERE id = ? AND state = 'preview'`).get(syncRecordId);
+    if (!record) throw new Error('The synchronization preview is missing or has already been applied.');
+    const summary = JSON.parse(record.summary_json);
+    const current = this.previewAssemblySync(record.assembly_model_id);
+    if (current.previewHash !== record.preview_hash) throw new Error('The plan or assembly changed after this preview. Review the synchronization diff again.');
+    if (current.counts.conflicted) throw new Error('Resolve conflicted entities before applying synchronization.');
+    const origin = this.loadEditorDocument({ modelId: summary.originModelId, viewKind: 'layout' });
+    const layout = this.loadEditorDocument({ modelId: record.assembly_model_id, viewKind: 'layout' });
+    const document = structuredClone(layout.document);
+    const mappings = this.database.prepare(`SELECT * FROM assembly_origin_mapping WHERE assembly_model_id = ?`).all(record.assembly_model_id);
+    const componentMapping = new Map(mappings.filter((row) => row.origin_entity_kind === 'component').map((row) => [row.origin_entity_id, row]));
+    const wireMapping = new Map(mappings.filter((row) => row.origin_entity_kind === 'conductor').map((row) => [row.origin_entity_id, row]));
+    const portMap = new Map();
+    for (const row of componentMapping.values()) {
+      const component = document.components[row.assembly_entity_id];
+      for (const port of component?.ports || []) portMap.set(port.metadata?.originPortId, port.id);
+    }
+    const mappingInsert = this.database.prepare(`
+      INSERT INTO assembly_origin_mapping(
+        id, assembly_model_id, assembly_entity_kind, assembly_entity_id,
+        origin_model_id, origin_entity_kind, origin_entity_id, origin_revision_id,
+        generation_rule_version, last_synced_content_hash, field_ownership_json
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+    for (const originId of origin.document.componentOrder) {
+      const source = origin.document.components[originId];
+      let mapping = componentMapping.get(originId);
+      let target = mapping ? document.components[mapping.assembly_entity_id] : null;
+      if (!target) {
+        const generated = cloneAssemblyDocument(origin.document, [originId], []);
+        target = generated.document.components[generated.componentMap.get(originId)];
+        target.position = { x: 120 + (document.componentOrder.length % 4) * 230, y: 120 + Math.floor(document.componentOrder.length / 4) * 190 };
+        document.components[target.id] = target;
+        document.componentOrder.push(target.id);
+        mapping = {
+          id: createId('origin-map'), assembly_entity_id: target.id, origin_entity_id: originId,
+        };
+        componentMapping.set(originId, mapping);
+        mappingInsert.run(mapping.id, record.assembly_model_id, 'component', target.id, summary.originModelId, 'component', originId, record.to_origin_revision_id, APP_VERSION, sha256(JSON.stringify(source)), JSON.stringify({ position: 'assembly', labels: 'plan', ports: 'plan' }));
+      }
+      target.labels = structuredClone(source.labels);
+      const existingByOrigin = new Map(target.ports.map((port) => [port.metadata?.originPortId, port]));
+      const usedBanks = new Map();
+      target.ports = source.ports.map((port, index) => {
+        const existing = existingByOrigin.get(port.id);
+        const next = existing || { ...structuredClone(port), id: createId('port') };
+        next.label = port.label;
+        next.function = port.function;
+        next.detail = port.detail;
+        next.electricalClass = port.electricalClass;
+        next.connectionPolicy = structuredClone(port.connectionPolicy);
+        next.metadata = { ...(next.metadata || {}), originPortId: port.id };
+        const side = port.side;
+        let bank = usedBanks.get(side);
+        if (!bank) {
+          bank = target.pinBanks.find((value) => value.side === side) || { id: createId('bank'), side, portIds: [], flow: 'forward', rowGap: 2, edgePadding: 12, collapseEmpty: false };
+          bank.portIds = [];
+          usedBanks.set(side, bank);
+        }
+        next.side = side;
+        next.bankId = bank.id;
+        next.order = index;
+        bank.portIds.push(next.id);
+        portMap.set(port.id, next.id);
+        return next;
+      });
+      target.pinBanks = [...usedBanks.values()];
+      target.metadata = { ...(target.metadata || {}), originComponentId: originId, detachedFromOrigin: false };
+      this.database.prepare(`UPDATE assembly_origin_mapping SET origin_revision_id = ?, last_synced_content_hash = ? WHERE id = ?`).run(record.to_origin_revision_id, sha256(JSON.stringify(source)), mapping.id);
+    }
+    const mapEndpoint = (endpoint) => {
+      if (endpoint.kind !== 'port') return structuredClone(endpoint);
+      const component = componentMapping.get(endpoint.componentId);
+      const portId = portMap.get(endpoint.portId);
+      return component && portId ? { kind: 'port', componentId: component.assembly_entity_id, portId } : { kind: 'off-page', point: { x: 0, y: 0 }, reference: `${endpoint.componentId}.${endpoint.portId}`, direction: 'east' };
+    };
+    for (const originId of origin.document.wireOrder) {
+      const source = origin.document.wires[originId];
+      let mapping = wireMapping.get(originId);
+      let target = mapping ? document.wires[mapping.assembly_entity_id] : null;
+      if (!target) {
+        target = structuredClone(source);
+        target.id = createId('wire');
+        delete target.route;
+        target.routing.constraints = [];
+        document.wires[target.id] = target;
+        document.wireOrder.push(target.id);
+        mapping = { id: createId('origin-map'), assembly_entity_id: target.id, origin_entity_id: originId };
+        wireMapping.set(originId, mapping);
+        mappingInsert.run(mapping.id, record.assembly_model_id, 'conductor', target.id, summary.originModelId, 'conductor', originId, record.to_origin_revision_id, APP_VERSION, sha256(JSON.stringify(source)), JSON.stringify({ route: 'assembly', appearance: 'assembly', connectivity: 'plan' }));
+      }
+      target.label = source.label;
+      target.signal = source.signal;
+      target.kind = source.kind;
+      target.source = mapEndpoint(source.source);
+      target.target = mapEndpoint(source.target);
+      target.metadata = { ...(target.metadata || {}), originWireId: originId, detachedFromOrigin: false };
+      this.database.prepare(`UPDATE assembly_origin_mapping SET origin_revision_id = ?, last_synced_content_hash = ? WHERE id = ?`).run(record.to_origin_revision_id, sha256(JSON.stringify(source)), mapping.id);
+    }
+    for (const detail of summary.details.filter((value) => value.state === 'detached')) {
+      const entity = detail.entityKind === 'component' ? document.components[detail.assemblyEntityId] : document.wires[detail.assemblyEntityId];
+      if (entity) entity.metadata = { ...(entity.metadata || {}), detachedFromOrigin: true };
+      this.database.prepare('DELETE FROM assembly_origin_mapping WHERE assembly_model_id = ? AND origin_entity_kind = ? AND origin_entity_id = ?').run(record.assembly_model_id, detail.entityKind, detail.originEntityId);
+    }
+    const usedDesignators = new Set();
+    for (const componentId of document.componentOrder) {
+      const component = document.components[componentId];
+      if (!component) continue;
+      const original = component.designator || component.id;
+      if (!usedDesignators.has(original)) {
+        usedDesignators.add(original);
+        continue;
+      }
+      const prefix = original.replace(/\d+$/u, '') || 'X';
+      let number = 1;
+      while (usedDesignators.has(`${prefix}${number}`)) number += 1;
+      component.designator = `${prefix}${number}`;
+      if (component.labels.title === original) component.labels.title = component.designator;
+      usedDesignators.add(component.designator);
+    }
+    this.saveEditorDocument({ modelId: record.assembly_model_id, pageId: layout.pageId, viewKind: 'layout', document, reason: `apply assembly sync ${record.id}` });
+    const schematicEnvelope = this.loadEditorDocument({ modelId: record.assembly_model_id, viewKind: 'schematic' });
+    const schematic = structuredClone(schematicEnvelope.document);
+    for (const id of document.componentOrder) {
+      const source = document.components[id];
+      if (!schematic.components[id]) {
+        schematic.components[id] = structuredClone(source);
+        schematic.components[id].position = { x: 120 + (schematic.componentOrder.length % 3) * 300, y: 100 + Math.floor(schematic.componentOrder.length / 3) * 240 };
+        schematic.componentOrder.push(id);
+      } else {
+        const position = schematic.components[id].position;
+        schematic.components[id] = { ...structuredClone(source), position, rotation: 0, mirrorX: false, mirrorY: false };
+      }
+    }
+    for (const id of document.wireOrder) {
+      const source = document.wires[id];
+      schematic.wires[id] = { ...structuredClone(source), routing: { ...structuredClone(source.routing), pattern: 'orthogonal', constraints: [] } };
+      delete schematic.wires[id].route;
+      if (!schematic.wireOrder.includes(id)) schematic.wireOrder.push(id);
+    }
+    this.saveEditorDocument({ modelId: record.assembly_model_id, pageId: schematicEnvelope.pageId, viewKind: 'schematic', document: schematic, reason: `apply assembly sync ${record.id}` });
+    const now = nowIso();
+    this.database.prepare(`UPDATE assembly_sync_record SET state = 'applied', applied_revision_id = ?, applied_at = ? WHERE id = ?`).run(record.to_origin_revision_id, now, record.id);
+    this.setWorkspaceState({ activeModelId: record.assembly_model_id, activePageId: layout.pageId, activeViewKind: 'layout' });
+    return { recordId: record.id, state: 'applied', counts: summary.counts, workspace: this.getWorkspace() };
   }
 
   listBomItems(modelId = null) {

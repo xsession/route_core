@@ -369,6 +369,45 @@ button { color: inherit; }
 .cable-preview > div { display: grid; grid-template-columns: 32px 1fr; grid-template-rows: auto auto; align-items: center; gap: 0 7px; padding: 6px; border: 1px solid var(--border); border-radius: 4px; background: var(--bg-1); }
 .cable-preview > div > span { grid-row: 1 / 3; width: 30px; height: 8px; border-radius: 4px; background: repeating-linear-gradient(115deg, var(--core) 0 8px, var(--stripe) 8px 10px, var(--core) 10px 16px); }
 .cable-preview small { color: var(--text-muted); font-size: 9px; }
+.mechanical-preview { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; padding: 8px; background: var(--canvas-bg); }
+.footprint-side { min-width: 0; padding: 6px; border: 1px solid var(--border); border-radius: 4px; background: var(--bg-1); color: var(--text-dim); text-align: center; }
+.footprint-side strong { display: block; margin-bottom: 4px; font-size: 9px; text-transform: uppercase; letter-spacing: .05em; }
+.footprint-side svg { width: 100%; height: 125px; display: block; }
+.footprint-side rect { fill: var(--bg-3); stroke: var(--text-muted); stroke-width: 1.2; }
+.footprint-side circle { fill: var(--accent); stroke: var(--text); stroke-width: 1; }
+.footprint-side text { fill: var(--text); font: 8px var(--font-mono); text-anchor: middle; }
+.cable-electrical-panel { grid-column: 1 / -1; }
+.validation-summary { padding-top: 4px; }
+.drawing-tool-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin-bottom: 8px; }
+.drawing-element-list { display: grid; gap: 5px; }
+.drawing-element-row { min-height: 42px; display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 7px; padding: 5px 7px; border: 1px solid var(--border); border-radius: 4px; background: var(--bg-1); }
+.drawing-element-row strong, .drawing-element-row small { display: block; }
+.drawing-element-row small { margin-top: 2px; color: var(--text-muted); font: 9px var(--font-mono); }
+.sync-summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: 7px; margin-bottom: 9px; }
+.sync-count { padding: 10px 6px; border: 1px solid var(--border); border-top: 3px solid var(--accent); border-radius: 4px; background: var(--bg-1); text-align: center; }
+.sync-count.detached { border-top-color: var(--warning); }
+.sync-count.conflicted { border-top-color: var(--danger); }
+.sync-count strong, .sync-count span { display: block; }
+.sync-count strong { font: 20px var(--font-mono); }
+.sync-count span { color: var(--text-muted); font-size: 9px; text-transform: uppercase; }
+.sync-state { font-weight: 650; text-transform: uppercase; }
+.sync-state.added, .sync-state.changed { color: var(--accent); }
+.sync-state.detached { color: var(--warning); }
+.sync-state.conflicted { color: var(--danger); }
+.spatial-host { position: absolute; inset: 0; z-index: 4; background: #0c1118; }
+.spatial-host canvas { width: 100%; height: 100%; display: block; touch-action: none; }
+.canvas-shell[data-spatial="true"] > .canvas,
+.canvas-shell[data-spatial="true"] > .canvas-empty,
+.canvas-shell[data-spatial="true"] > .canvas-coordinates,
+.canvas-shell[data-spatial="true"] > .connection-hint { display: none !important; }
+.spatial-metrics { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 5px; }
+.spatial-metrics > div { padding: 7px 3px; border: 1px solid var(--border); border-radius: 4px; background: var(--bg-1); text-align: center; }
+.spatial-metrics strong, .spatial-metrics span { display: block; }
+.spatial-metrics strong { font: 14px var(--font-mono); }
+.spatial-metrics span { margin-top: 2px; color: var(--text-muted); font-size: 8px; text-transform: uppercase; }
+.spatial-metrics .valid strong { color: var(--success); }
+.spatial-metrics .invalid strong { color: var(--danger); }
+.viewpoint-list { display: grid; gap: 5px; }
 .cable-core-list { display: grid; gap: 6px; }
 .cable-core-card { width: 100%; min-height: 48px; display: grid; grid-template-columns: 66px minmax(0, 1fr) auto; align-items: center; gap: 9px; padding: 6px 8px; border: 1px solid var(--border); border-radius: 4px; background: var(--bg-1); color: var(--text-dim); text-align: left; cursor: pointer; }
 .cable-core-card:hover { border-color: var(--accent); background: var(--accent-soft); color: var(--text); }

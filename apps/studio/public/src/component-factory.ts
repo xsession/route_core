@@ -107,6 +107,12 @@ export interface CustomComponentInput {
   partNumber: string;
   category: string;
   tags: string[];
+  mechanicalFootprints: {
+    bodyWidthMm: number;
+    bodyHeightMm: number;
+    pinPitchMm: number;
+    rowSpacingMm: number;
+  };
   ports: Array<{
     label: string;
     function: string;
@@ -144,6 +150,25 @@ export function buildCustomLibraryComponent(input: CustomComponentInput): Librar
     }));
   }
   const component = builder.build();
+  const footprint = input.mechanicalFootprints;
+  const centeredOffset = (input.ports.length - 1) / 2;
+  component.metadata = {
+    ...(component.metadata || {}),
+    mechanicalFootprints: {
+      bodyWidthMm: footprint.bodyWidthMm,
+      bodyHeightMm: footprint.bodyHeightMm,
+      mateSide: input.ports.map((port, index) => ({
+        logicalPin: port.label,
+        xMm: (index - centeredOffset) * footprint.pinPitchMm,
+        yMm: -footprint.rowSpacingMm / 2,
+      })),
+      wireSide: input.ports.map((port, index) => ({
+        logicalPin: port.label,
+        xMm: (centeredOffset - index) * footprint.pinPitchMm,
+        yMm: footprint.rowSpacingMm / 2,
+      })),
+    },
+  };
   return {
     id: definitionId,
     name: input.name,

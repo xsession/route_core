@@ -1,5 +1,6 @@
 import type {
   ComponentNode,
+  DrawingElement,
   EditorDocument,
   HitResult,
   Point,
@@ -115,7 +116,39 @@ export interface WorkspacePayload {
   workspace: WorkspaceState;
   editor: EditorEnvelope;
   bom: BomItem[];
+  drawingElements: DrawingElement[];
   revisions: RevisionSummary[];
+}
+
+export interface AssemblySyncDetail {
+  state: 'added' | 'changed' | 'detached' | 'conflicted';
+  entityKind: string;
+  originEntityId: string;
+  assemblyEntityId: string | null;
+  explanation: string;
+}
+
+export interface AssemblySyncPreview {
+  id: string;
+  previewHash: string;
+  assemblyModelId: string;
+  originModelId: string;
+  originPageId: string;
+  counts: Record<AssemblySyncDetail['state'], number>;
+  details: AssemblySyncDetail[];
+}
+
+export interface MechanicalFootprintPin {
+  logicalPin: string;
+  xMm: number;
+  yMm: number;
+}
+
+export interface MechanicalFootprints {
+  bodyWidthMm: number;
+  bodyHeightMm: number;
+  mateSide: MechanicalFootprintPin[];
+  wireSide: MechanicalFootprintPin[];
 }
 
 export interface LibraryComponent {

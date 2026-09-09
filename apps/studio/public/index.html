@@ -117,6 +117,7 @@
             <button class="tool-button" id="tool-delete" title="Delete selection"><span>⌫</span><small>Delete</small></button>
           </div>
           <section id="canvas-shell" class="canvas-shell" tabindex="0" aria-label="Harness CAD editor canvas">
+            <div id="spatial-host" class="spatial-host" hidden></div>
             <div id="canvas" class="canvas"></div>
             <div id="canvas-empty" class="canvas-empty" hidden>
               <div class="empty-symbol">▣─⌁─▣</div>
@@ -147,6 +148,7 @@
           <button class="dock-tab active" data-right-tab="properties">Properties</button>
           <button class="dock-tab" data-right-tab="style">Style</button>
           <button class="dock-tab" data-right-tab="rules">Rules</button>
+          <button class="dock-tab" data-right-tab="drawing">Drawing</button>
         </div>
         <div id="right-content" class="dock-content inspector-content"></div>
       </aside>
@@ -166,6 +168,7 @@
     <div id="modal-root"></div>
     <div id="toast-root" class="toast-root" aria-live="polite"></div>
   </div>
+  <script type="importmap">{"imports":{"three":"/vendor/three/three.module.js","three/addons/":"/vendor/three/addons/"}}</script>
   <script type="module" src="/js/main.js"></script>
 </body>
 </html>

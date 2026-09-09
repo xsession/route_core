@@ -4,9 +4,12 @@ import {
   HarnessEditorEngine,
   contrastingText,
   createEmptyDocument,
+  createSpatialHarnessDocument,
   renderEditorSvg,
   type ComponentNode,
   type EditorDocument,
+  type DrawingElement,
+  type SpatialHarnessDocument,
   type ElectricalClass,
   type HitResult,
   type LabelNode,
@@ -49,8 +52,10 @@ import {
   textControl,
 } from './dom.js';
 import { ModalManager, toast, type ToastKind } from './modal.js';
+import { SpatialHarnessEditor, type SpatialSelection } from './spatial-editor.js';
 import type {
   BomItem,
+  AssemblySyncPreview,
   BootstrapPayload,
   CommandLogEntry,
   ExportDefinition,
@@ -110,6 +115,11 @@ const ELECTRICAL_CLASSES: ElectricalClass[] = [
 const SIDES: Side[] = ['west', 'east', 'north', 'south'];
 const COMPONENT_KINDS: ComponentNode['kind'][] = ['connector', 'device', 'inline-device', 'passive', 'branch-point', 'termination', 'terminal-point', 'custom'];
 const WIRE_KINDS: WireEdge['kind'][] = ['discrete', 'cable-core', 'shield', 'drain', 'bundle', 'mate', 'annotation'];
+const CABLE_COLOR_SEQUENCES: Record<string, string[]> = {
+  iec: ['#22c55e', '#2563eb', '#92400e', '#111827', '#6b7280', '#f97316', '#a855f7', '#ffffff'],
+  din: ['#ffffff', '#92400e', '#22c55e', '#facc15', '#6b7280', '#ec4899', '#2563eb', '#dc2626', '#111827', '#a855f7'],
+  sae: ['#111827', '#92400e', '#dc2626', '#f97316', '#facc15', '#22c55e', '#2563eb', '#a855f7', '#6b7280', '#ffffff'],
+};
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
@@ -216,6 +226,9 @@ class StudioApplication {
   private currentViewport!: ViewportState;
   private menuOpen: string | null = null;
   private splitDrag: { side: 'left' | 'right'; startX: number; startWidth: number } | null = null;
+  private spatialEditor?: SpatialHarnessEditor;
+  private spatialMode = false;
+  private spatialSelection: SpatialSelection = { cableId: null, pointIndex: null };
   private readonly queueSave = debounce(() => void this.saveNow(), 420);
 
   public async start(): Promise<void> {
@@ -249,6 +262,7 @@ class StudioApplication {
         },
       );
       this.host.setTheme(this.theme === 'dark');
+      this.host.setDrawingElements(this.workspace.drawingElements || []);
       this.currentViewport = this.host.viewport as ViewportState;
       this.bindStaticUi();
       this.renderAll();
@@ -346,6 +360,11 @@ class StudioApplication {
       if (button) void this.openAuthoringSurface(button.dataset.surface!);
     });
     byId('view-tabs').addEventListener('click', (event) => {
+      const spatial = (event.target as Element).closest<HTMLButtonElement>('[data-spatial-view]');
+      if (spatial) {
+        void this.openSpatialView();
+        return;
+      }
       const button = (event.target as Element).closest<HTMLButtonElement>('[data-page-id]');
       if (button) void this.switchView(button.dataset.modelId!, button.dataset.pageId!, button.dataset.viewKind!);
     });
@@ -484,18 +503,18 @@ class StudioApplication {
     const pages = this.workspace.pages.filter((page) => page.modelId === this.workspace.workspace.activeModelId);
     const model = this.workspace.models.find((value) => value.id === this.workspace.workspace.activeModelId);
     root.innerHTML = pages.map((page) => `
-      <button class="view-tab${page.id === this.workspace.workspace.activePageId && page.viewKind === this.workspace.workspace.activeViewKind ? ' active' : ''}"
+      <button class="view-tab${!this.spatialMode && page.id === this.workspace.workspace.activePageId && page.viewKind === this.workspace.workspace.activeViewKind ? ' active' : ''}"
         data-model-id="${escapeAttribute(page.modelId)}" data-page-id="${escapeAttribute(page.id)}" data-view-kind="${escapeAttribute(page.viewKind)}">
         <span class="view-tab-icon" aria-hidden="true">${page.viewKind === 'schematic' ? '⌁' : '⌑'}</span>${page.viewKind === 'schematic' ? 'Schematic' : page.viewKind === 'layout' ? 'Layout' : escapeHtml(page.name)}
         <span class="view-tab-purpose">${page.viewKind === 'schematic' ? 'pin-level' : model?.kind === 'assembly' ? 'drawing' : 'topology'}</span>
-      </button>`).join('');
+      </button>`).join('') + (model?.kind === 'assembly' ? `<button class="view-tab${this.spatialMode ? ' active' : ''}" data-spatial-view="true"><span class="view-tab-icon" aria-hidden="true">3D</span>Product fit<span class="view-tab-purpose">spatial harness</span></button>` : '');
   }
 
   private renderBreadcrumb(): void {
     const model = this.workspace.models.find((value) => value.id === this.workspace.workspace.activeModelId);
     const page = this.workspace.pages.find((value) => value.id === this.workspace.workspace.activePageId);
     const surface = model?.kind === 'assembly' ? 'Assembly Builder' : 'Project Builder';
-    byId('breadcrumb').innerHTML = `<strong>${surface}</strong> · ${escapeHtml(this.workspace.meta.name)} / ${escapeHtml(model?.name || 'Model')} / ${escapeHtml(page?.name || this.workspace.workspace.activeViewKind)}`;
+    byId('breadcrumb').innerHTML = `<strong>${surface}</strong> · ${escapeHtml(this.workspace.meta.name)} / ${escapeHtml(model?.name || 'Model')} / ${escapeHtml(this.spatialMode ? 'Product fit 3D' : page?.name || this.workspace.workspace.activeViewKind)}`;
   }
 
   private renderLeftPanel(): void {
@@ -584,6 +603,14 @@ class StudioApplication {
 
   private renderInspector(): void {
     const root = byId('right-content');
+    if (this.spatialMode) {
+      this.renderSpatialInspector(root);
+      return;
+    }
+    if (this.activeRightTab === 'drawing') {
+      this.renderDrawingInspector(root);
+      return;
+    }
     const primary = this.host?.engine.selection.primary;
     if (!primary) {
       this.renderDocumentInspector(root);
@@ -596,6 +623,59 @@ class StudioApplication {
       const component = this.host.engine.document.components[primary.id];
       this.renderPortInspector(root, component, component?.ports.find((port) => port.id === primary.subId));
     } else root.innerHTML = '<div class="inspector-empty">The selected handle has no editable properties.</div>';
+  }
+
+  private renderDrawingInspector(root: HTMLElement): void {
+    const model = this.workspace.models.find((value) => value.id === this.workspace.workspace.activeModelId);
+    const isAssemblyLayout = model?.kind === 'assembly' && this.workspace.workspace.activeViewKind === 'layout';
+    if (!isAssemblyLayout) {
+      root.innerHTML = '<div class="inspector-empty">Manufacturing drawing elements are available on an assembly Layout view. The schematic remains an electrical projection.</div>';
+      return;
+    }
+    const elements = this.workspace.drawingElements || [];
+    const labels: Record<string, string> = { dimension: 'Linked dimension', 'leader-note': 'Leader note', 'title-block': 'Title block', 'bom-table': 'Live BOM', 'wire-schedule': 'Wire schedule' };
+    root.innerHTML = `
+      <section class="panel-section"><div class="panel-section-header">Manufacturing drawing</div><div class="panel-section-body">
+        <div class="drawing-tool-grid">${Object.entries(labels).map(([kind, label]) => `<button class="secondary-button" data-action="drawing-add" data-drawing-kind="${kind}">${label}</button>`).join('')}</div>
+        <div class="callout">Tables are query-backed and refresh from the current BOM and conductor data. Dimensions can remain linked to two selected components.</div>
+      </div></section>
+      <section class="panel-section"><div class="panel-section-header">Elements <span class="count">${elements.length}</span></div><div class="panel-section-body drawing-element-list">
+        ${elements.map((element) => `<div class="drawing-element-row"><span><strong>${escapeHtml(labels[element.kind] || element.kind)}</strong><small>${formatNumber(element.x)}, ${formatNumber(element.y)} · ${formatNumber(element.width)} × ${formatNumber(element.height)}</small></span><button class="row-delete" data-action="drawing-delete" data-drawing-id="${escapeAttribute(element.id)}" title="Delete drawing element">×</button></div>`).join('') || '<div class="panel-empty">No drawing elements.</div>'}
+      </div></section>
+      <section class="panel-section"><div class="panel-section-header">Plan synchronization</div><div class="panel-section-body"><button class="primary-button" data-action="assembly-sync-review">Review changes before apply</button></div></section>`;
+  }
+
+  private renderSpatialInspector(root: HTMLElement): void {
+    const state = this.spatialEditor?.state;
+    if (!state) {
+      root.innerHTML = '<div class="inspector-empty">Opening the 3D harness editor…</div>';
+      return;
+    }
+    const cableId = this.spatialSelection.cableId || state.cableOrder[0] || '';
+    const cable = state.cables[cableId];
+    const analysis = this.spatialEditor?.analysis(cableId);
+    const collisions = this.spatialEditor?.collisionCount(cableId) || 0;
+    root.innerHTML = `
+      <section class="panel-section"><div class="panel-section-header">Product model</div><div class="panel-section-body form-grid">
+        ${fieldRow('Model', `<div class="readout">${escapeHtml(state.productModel?.name || 'Built-in fit-check fixture')}</div>`)}
+        <input id="spatial-product-file" type="file" accept=".glb,model/gltf-binary" hidden />
+        <div class="button-row start"><button class="primary-button" data-action="spatial-import">Import GLB</button><button class="secondary-button" data-action="spatial-fit">Fit all</button></div>
+        ${fieldRow('Product opacity', textControl('spatial-opacity', state.productModel?.opacity ?? 0.42, { type: 'number', min: 0.05, max: 1, step: 0.05 }))}
+        ${fieldRow('Section plane', selectControl('spatial-section-axis', 'none', ['none', 'x', 'y', 'z']))}
+        ${fieldRow('Section offset mm', textControl('spatial-section-offset', 0, { type: 'number', step: 10 }))}
+      </div></section>
+      <section class="panel-section"><div class="panel-section-header">Cable path <span class="count">${state.cableOrder.length}</span></div><div class="panel-section-body form-grid">
+        ${fieldRow('Cable', `<select id="spatial-cable" class="form-control">${state.cableOrder.map((id) => `<option value="${escapeAttribute(id)}"${selected(id, cableId)}>${escapeHtml(state.cables[id]?.label || id)}</option>`).join('')}</select>`)}
+        ${cable ? fieldRow('Routing mode', selectControl('spatial-surface-mode', cable.surfaceMode, ['free', 'on-surface', 'inside-product'])) : ''}
+        ${cable ? `<div class="inline-fields">${fieldRow('Diameter mm', textControl('spatial-diameter', cable.diameterMm, { type: 'number', min: 0.1, step: 0.1 }))}${fieldRow('Min bend mm', textControl('spatial-bend-radius', cable.minimumBendRadiusMm, { type: 'number', min: 0.1, step: 0.5 }))}</div>` : ''}
+        ${analysis ? `<div class="spatial-metrics"><div><strong>${formatNumber(analysis.lengthMm, 1)}</strong><span>length mm</span></div><div class="${analysis.valid ? 'valid' : 'invalid'}"><strong>${analysis.minimumObservedBendRadiusMm == null ? '—' : formatNumber(analysis.minimumObservedBendRadiusMm, 1)}</strong><span>minimum bend</span></div><div class="${analysis.valid ? 'valid' : 'invalid'}"><strong>${analysis.bendViolations.length}</strong><span>bend issues</span></div><div class="${collisions ? 'invalid' : 'valid'}"><strong>${collisions}</strong><span>clashes</span></div></div>` : ''}
+        <div class="button-row start"><button class="secondary-button" data-action="spatial-add-point"${cable ? '' : ' disabled'}>Add control point</button><button class="secondary-button" data-action="spatial-delete-point"${this.spatialSelection.pointIndex == null ? ' disabled' : ''}>Delete point</button></div>
+        <div class="callout${analysis?.valid ? ' success' : ' warning'}">${this.spatialSelection.pointIndex == null ? 'Select a blue control point in the 3D view, then drag the transform gizmo. Endpoints remain attached.' : `Editing control point ${this.spatialSelection.pointIndex + 1}. Red cable geometry marks a minimum-bend-radius violation.`}</div>
+      </div></section>
+      <section class="panel-section"><div class="panel-section-header">Documentation viewpoints</div><div class="panel-section-body viewpoint-list">
+        ${state.viewpoints.map((viewpoint) => `<button class="secondary-button" data-action="spatial-viewpoint" data-viewpoint-id="${escapeAttribute(viewpoint.id)}">${escapeHtml(viewpoint.name)}</button>`).join('') || '<div class="panel-empty">No saved viewpoints.</div>'}
+        <div class="button-row start"><button class="primary-button" data-action="spatial-capture-view">Capture view</button><button class="secondary-button" data-action="spatial-screenshot">PNG snapshot</button></div>
+      </div></section>`;
   }
 
   private renderDocumentInspector(root: HTMLElement): void {
@@ -918,6 +998,10 @@ class StudioApplication {
 
   private handleInspectorChange(event: Event): void {
     const input = event.target as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement;
+    if (this.spatialMode) {
+      void this.handleSpatialInspectorChange(input);
+      return;
+    }
     const primary = this.host.engine.selection.primary;
     try {
       if (!primary) {
@@ -933,6 +1017,35 @@ class StudioApplication {
       toast('Edit was rejected', errorMessage(error), 'error');
       this.renderInspector();
     }
+  }
+
+  private async handleSpatialInspectorChange(input: HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement): Promise<void> {
+    if (!this.spatialEditor) return;
+    if (input.id === 'spatial-product-file') {
+      const file = (input as HTMLInputElement).files?.[0];
+      if (!file) return;
+      try {
+        await this.spatialEditor.importProduct(file);
+        this.renderInspector();
+        toast('3D product imported', `${file.name} is embedded in the project for offline fit checks.`, 'success');
+      } catch (error) {
+        toast('3D import failed', errorMessage(error), 'error');
+      }
+      return;
+    }
+    if (input.id === 'spatial-cable') {
+      this.spatialEditor.selectCable(input.value);
+      return;
+    }
+    if (input.id === 'spatial-diameter') this.spatialEditor.updateSelectedCable({ diameterMm: Number(input.value) });
+    if (input.id === 'spatial-bend-radius') this.spatialEditor.updateSelectedCable({ minimumBendRadiusMm: Number(input.value) });
+    if (input.id === 'spatial-surface-mode') this.spatialEditor.updateSelectedCable({ surfaceMode: input.value as 'free' | 'on-surface' | 'inside-product' });
+    if (input.id === 'spatial-opacity') this.spatialEditor.setProductOpacity(Number(input.value));
+    if (input.id === 'spatial-section-axis' || input.id === 'spatial-section-offset') {
+      const root = byId('right-content');
+      this.spatialEditor.setSection(query<HTMLSelectElement>('#spatial-section-axis', root).value as 'none' | 'x' | 'y' | 'z', Number(query<HTMLInputElement>('#spatial-section-offset', root).value));
+    }
+    this.renderInspector();
   }
 
   private handleDocumentInspectorChange(input: HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement): void {
@@ -1098,6 +1211,53 @@ class StudioApplication {
     const primary = this.host.engine.selection.primary;
     try {
       switch (action) {
+        case 'spatial-import': query<HTMLInputElement>('#spatial-product-file', byId('right-content')).click(); break;
+        case 'spatial-fit': this.spatialEditor?.fit(); break;
+        case 'spatial-add-point': this.spatialEditor?.addControlPoint(); break;
+        case 'spatial-delete-point': this.spatialEditor?.deleteControlPoint(); break;
+        case 'spatial-viewpoint': {
+          const id = target.closest<HTMLElement>('[data-viewpoint-id]')?.dataset.viewpointId;
+          const viewpoint = this.spatialEditor?.state.viewpoints.find((value) => value.id === id);
+          if (viewpoint) this.spatialEditor?.applyViewpoint(viewpoint);
+          break;
+        }
+        case 'spatial-capture-view': {
+          const name = await this.modal.open<string>({
+            title: 'Capture documentation viewpoint',
+            body: fieldRow('View name', textControl('spatial-view-name', `View ${Number(this.spatialEditor?.state.viewpoints.length || 0) + 1}`)),
+            confirmLabel: 'Capture',
+            onConfirm: ({ body }) => query<HTMLInputElement>('#spatial-view-name', body).value.trim() || 'View',
+          });
+          if (name) {
+            this.spatialEditor?.captureViewpoint(name);
+            this.renderInspector();
+          }
+          break;
+        }
+        case 'spatial-screenshot': {
+          if (!this.spatialEditor) break;
+          const anchor = document.createElement('a');
+          anchor.href = this.spatialEditor.screenshot();
+          anchor.download = `${(this.workspace.models.find((value) => value.id === this.workspace.workspace.activeModelId)?.name || 'assembly').replace(/[^a-z0-9_-]+/gi, '-')}-3d.png`;
+          anchor.click();
+          break;
+        }
+        case 'drawing-add': {
+          const kind = target.closest<HTMLElement>('[data-drawing-kind]')?.dataset.drawingKind as DrawingElement['kind'] | undefined;
+          if (kind) await this.addDrawingElement(kind);
+          break;
+        }
+        case 'drawing-delete': {
+          const id = target.closest<HTMLElement>('[data-drawing-id]')?.dataset.drawingId;
+          if (id) {
+            await this.api.delete<{ deleted: boolean }>(`/api/project/drawing-elements/${encodeURIComponent(id)}`);
+            this.workspace.drawingElements = this.workspace.drawingElements.filter((element) => element.id !== id);
+            this.host.setDrawingElements(this.workspace.drawingElements);
+            this.renderInspector();
+          }
+          break;
+        }
+        case 'assembly-sync-review': await this.assemblySyncDialog(); break;
         case 'project-properties': await this.projectPropertiesDialog(); break;
         case 'integrity-check': await this.integrityDialog(); break;
         case 'route-all': this.host.engine.autoRoute(); break;
@@ -1281,11 +1441,135 @@ class StudioApplication {
     await this.switchView(modelId, preferred.id, preferred.viewKind);
   }
 
+  private async openSpatialView(): Promise<void> {
+    const model = this.workspace.models.find((value) => value.id === this.workspace.workspace.activeModelId);
+    if (model?.kind !== 'assembly') return;
+    if (this.workspace.workspace.activeViewKind !== 'layout') {
+      const layout = pageForView(this.workspace, model.id, 'layout');
+      if (!layout) return;
+      await this.switchView(model.id, layout.id, 'layout');
+    }
+    const document = this.host.engine.document as EditorDocument;
+    const previous = document.metadata?.spatialHarness as SpatialHarnessDocument | undefined;
+    const state = createSpatialHarnessDocument(document, previous);
+    if (!previous) {
+      this.host.engine.execute('initialize 3D spatial harness', (draft) => {
+        draft.metadata = { ...(draft.metadata || {}), spatialHarness: state };
+      });
+    }
+    if (!this.spatialEditor) {
+      this.spatialEditor = new SpatialHarnessEditor(byId('spatial-host'), {
+        onChanged: (next, reason) => {
+          this.host.engine.execute(reason, (draft) => {
+            draft.metadata = { ...(draft.metadata || {}), spatialHarness: next };
+          });
+          this.renderSpatialInspector(byId('right-content'));
+        },
+        onSelectionChanged: (selection) => {
+          this.spatialSelection = selection;
+          this.renderSpatialInspector(byId('right-content'));
+        },
+      });
+    }
+    this.spatialMode = true;
+    this.spatialSelection = { cableId: state.cableOrder[0] || null, pointIndex: null };
+    this.spatialEditor.setState(state);
+    byId('canvas-shell').dataset.spatial = 'true';
+    byId('spatial-host').hidden = false;
+    byId('tool-rail').hidden = true;
+    this.renderViewTabs();
+    this.renderBreadcrumb();
+    this.renderInspector();
+    this.setStatus('3D product fit-check editor · drag blue path control points to shape the harness.');
+  }
+
+  private closeSpatialView(): void {
+    if (!this.spatialMode) return;
+    this.spatialMode = false;
+    delete byId('canvas-shell').dataset.spatial;
+    byId('spatial-host').hidden = true;
+    byId('tool-rail').hidden = false;
+  }
+
+  private async addDrawingElement(kind: DrawingElement['kind']): Promise<void> {
+    const document = this.host.engine.document;
+    const selectedComponents = this.host.engine.selection.items.filter((item) => item.kind === 'component').map((item) => item.id);
+    let content: DrawingElement['content'] = {};
+    if (kind === 'leader-note') {
+      const note = await this.modal.open<string>({
+        title: 'Leader note',
+        subtitle: 'Manufacturing annotation',
+        body: fieldRow('Note', '<textarea id="drawing-note" class="form-textarea">Inspect seal and terminal retention before release.</textarea>', { stacked: true }),
+        confirmLabel: 'Add note',
+        onConfirm: ({ body }) => {
+          const value = query<HTMLTextAreaElement>('#drawing-note', body).value.trim();
+          if (!value) throw new Error('A leader note requires text.');
+          return value;
+        },
+      });
+      if (!note) return;
+      content = { text: note, leaderX: -45, leaderY: 75 };
+    }
+    const defaults: Record<DrawingElement['kind'], Partial<DrawingElement>> = {
+      dimension: { x: 100, y: 70, width: 240, height: 40, query: selectedComponents.length >= 2 ? { fromEntityId: selectedComponents[0], toEntityId: selectedComponents[1] } : {} },
+      'leader-note': { x: 420, y: 120, width: 230, height: 48 },
+      'title-block': { x: 650, y: 610, width: 330, height: 95 },
+      'bom-table': { x: 650, y: 60, width: 330, height: 240, query: { source: 'bom' } },
+      'wire-schedule': { x: 650, y: 320, width: 330, height: 260, query: { source: 'wires' } },
+    };
+    const saved = await this.api.put<DrawingElement>('/api/project/drawing-elements', {
+      modelId: this.workspace.workspace.activeModelId,
+      pageId: this.workspace.workspace.activePageId,
+      kind,
+      ...defaults[kind],
+      content,
+    });
+    this.workspace.drawingElements = [...this.workspace.drawingElements, saved];
+    this.host.setDrawingElements(this.workspace.drawingElements);
+    this.renderInspector();
+    toast('Drawing element added', kind === 'dimension' && selectedComponents.length >= 2 ? 'The dimension is linked to the selected components.' : 'The manufacturing view was updated.', 'success');
+  }
+
+  private async assemblySyncDialog(): Promise<void> {
+    await this.saveNow(true);
+    const preview = await this.api.post<AssemblySyncPreview>('/api/project/assembly-sync/preview', { assemblyModelId: this.workspace.workspace.activeModelId });
+    const states: AssemblySyncPreview['details'][number]['state'][] = ['added', 'changed', 'detached', 'conflicted'];
+    const body = `
+      <div class="sync-summary">${states.map((state) => `<div class="sync-count ${state}"><strong>${preview.counts[state]}</strong><span>${state}</span></div>`).join('')}</div>
+      <div class="callout${preview.counts.conflicted ? ' warning' : ' success'}">${preview.counts.conflicted ? 'Conflicts must be resolved in the plan or assembly before apply.' : 'The preview is stable and can be applied. Assembly-owned positions, routes, and appearance will be preserved.'}</div>
+      <div class="table-scroll tall"><table class="data-table"><thead><tr><th>State</th><th>Entity</th><th>Explanation</th></tr></thead><tbody>${preview.details.map((detail) => `<tr><td><span class="sync-state ${detail.state}">${detail.state}</span></td><td class="mono">${escapeHtml(detail.entityKind)} · ${escapeHtml(detail.originEntityId)}</td><td>${escapeHtml(detail.explanation)}</td></tr>`).join('') || '<tr><td colspan="3" class="panel-empty">Assembly and project plan are synchronized.</td></tr>'}</tbody></table></div>`;
+    const applied = await this.modal.open<{ workspace: WorkspacePayload } | null>({
+      title: 'Assembly synchronization review',
+      subtitle: 'Added, changed, detached, and conflicted entities before apply',
+      body,
+      size: 'large',
+      confirmLabel: preview.details.length ? 'Apply synchronization' : 'Close',
+      onConfirm: async () => {
+        if (!preview.details.length) return null;
+        if (preview.counts.conflicted) throw new Error('Resolve conflicts before applying this synchronization.');
+        return this.api.post<{ workspace: WorkspacePayload }>('/api/project/assembly-sync/apply', { syncRecordId: preview.id });
+      },
+    });
+    if (applied?.workspace) {
+      this.workspace = applied.workspace;
+      this.host.load(this.workspace.editor.document, this.workspace.workspace.viewportState);
+      this.host.setTheme(this.theme === 'dark');
+      this.host.setDrawingElements(this.workspace.drawingElements || []);
+      this.renderAll();
+      toast('Assembly synchronized', `${Object.values(preview.counts).reduce((sum, value) => sum + value, 0)} change${preview.details.length === 1 ? '' : 's'} reviewed and applied.`, 'success');
+    }
+  }
+
   private async switchView(modelId: string, pageId: string, viewKind: ViewKind): Promise<void> {
-    if (modelId === this.workspace.workspace.activeModelId && pageId === this.workspace.workspace.activePageId && viewKind === this.workspace.workspace.activeViewKind) return;
+    const leavingSpatial = this.spatialMode;
+    this.closeSpatialView();
+    if (modelId === this.workspace.workspace.activeModelId && pageId === this.workspace.workspace.activePageId && viewKind === this.workspace.workspace.activeViewKind) {
+      if (leavingSpatial) this.renderAll();
+      return;
+    }
     await this.saveNow(true);
     this.setStatus('Switching editor projection…');
-    const result = await this.api.post<{ workspace: WorkspacePayload['workspace']; editor: WorkspacePayload['editor'] }>('/api/project/select-view', {
+    const result = await this.api.post<{ workspace: WorkspacePayload['workspace']; editor: WorkspacePayload['editor']; drawingElements: DrawingElement[] }>('/api/project/select-view', {
       modelId,
       pageId,
       viewKind,
@@ -1293,6 +1577,7 @@ class StudioApplication {
     });
     this.workspace.workspace = result.workspace;
     this.workspace.editor = result.editor;
+    this.workspace.drawingElements = result.drawingElements;
     const [bom, revisions] = await Promise.all([
       this.api.get<BomItem[]>(`/api/project/bom?modelId=${encodeURIComponent(modelId)}`),
       this.api.get<RevisionSummary[]>(`/api/project/revisions?modelId=${encodeURIComponent(modelId)}`),
@@ -1303,6 +1588,7 @@ class StudioApplication {
     this.savedRevision = 0;
     this.host.load(result.editor.document, result.workspace.viewportState);
     this.host.setTheme(this.theme === 'dark');
+    this.host.setDrawingElements(result.drawingElements);
     this.renderAll();
     document.title = `${this.workspace.meta.name} — ${APPLICATION_NAME}`;
     this.log('info', `Opened ${viewKind} view for ${modelId}.`);
@@ -1519,6 +1805,7 @@ class StudioApplication {
   }
 
   private async adoptWorkspace(workspace: WorkspacePayload, message: string): Promise<void> {
+    this.closeSpatialView();
     this.workspace = workspace;
     const refresh = await this.api.get<BootstrapPayload>('/api/bootstrap');
     this.bootstrap = refresh;
@@ -1531,6 +1818,7 @@ class StudioApplication {
     this.commandLog = [];
     this.host.load(this.workspace.editor.document, this.workspace.workspace.viewportState);
     this.host.setTheme(this.theme === 'dark');
+    this.host.setDrawingElements(this.workspace.drawingElements || []);
     this.renderAll();
     document.title = `${this.workspace.meta.name} — ${APPLICATION_NAME}`;
     this.setSaveIndicator('saved');
@@ -1615,6 +1903,12 @@ class StudioApplication {
       partNumber: query<HTMLInputElement>('#creator-part-number', root).value.trim(),
       category: query<HTMLInputElement>('#creator-category', root).value.trim() || 'custom',
       tags: query<HTMLInputElement>('#creator-tags', root).value.split(',').map((value) => value.trim()).filter(Boolean),
+      mechanicalFootprints: {
+        bodyWidthMm: Math.max(1, Number(query<HTMLInputElement>('#creator-body-width', root).value) || 24),
+        bodyHeightMm: Math.max(1, Number(query<HTMLInputElement>('#creator-body-height', root).value) || 18),
+        pinPitchMm: Math.max(0.1, Number(query<HTMLInputElement>('#creator-pin-pitch', root).value) || 2.54),
+        rowSpacingMm: Math.max(0, Number(query<HTMLInputElement>('#creator-row-spacing', root).value) || 6),
+      },
       ports,
     };
   }
@@ -1640,6 +1934,17 @@ class StudioApplication {
         theme: this.theme === 'dark' ? DEFAULT_DARK_THEME : DEFAULT_LIGHT_THEME,
         options: { showGrid: true, showPorts: true, showLabels: true, showRouteHandles: false, showDiagnostics: false, includeAccessibility: false },
       });
+      const mechanical = queryOptional<HTMLElement>('#mechanical-preview', root);
+      const footprints = component.metadata?.mechanicalFootprints as { bodyWidthMm: number; bodyHeightMm: number; mateSide: Array<{ logicalPin: string; xMm: number; yMm: number }>; wireSide: Array<{ logicalPin: string; xMm: number; yMm: number }> } | undefined;
+      if (mechanical && footprints) {
+        const renderSide = (label: string, pins: typeof footprints.mateSide) => {
+          const scale = Math.min(7, 150 / Math.max(footprints.bodyWidthMm, footprints.bodyHeightMm));
+          const width = footprints.bodyWidthMm * scale;
+          const height = footprints.bodyHeightMm * scale;
+          return `<div class="footprint-side"><strong>${label}</strong><svg viewBox="-90 -70 180 140" role="img" aria-label="${label} mechanical footprint"><rect x="${-width / 2}" y="${-height / 2}" width="${width}" height="${height}" rx="5" />${pins.map((pin) => `<g transform="translate(${pin.xMm * scale} ${pin.yMm * scale})"><circle r="5"/><text y="-8">${escapeHtml(pin.logicalPin)}</text></g>`).join('')}</svg></div>`;
+        };
+        mechanical.innerHTML = renderSide('Mate side', footprints.mateSide) + renderSide('Wire side', footprints.wireSide);
+      }
     } catch (error) {
       preview.innerHTML = `<div class="panel-empty">${escapeHtml(errorMessage(error))}</div>`;
     }
@@ -1659,6 +1964,11 @@ class StudioApplication {
             ${fieldRow('Category', textControl('creator-category', 'connector'))}
             ${fieldRow('Tags', textControl('creator-tags', 'custom, connector'), { stacked: true })}
           </div>
+          <div class="modal-panel-title">Mechanical footprint (independent from schematic)</div>
+          <div class="modal-panel-body form-grid">
+            <div class="inline-fields">${fieldRow('Body width mm', textControl('creator-body-width', 24, { type: 'number', min: 1, step: 0.1 }))}${fieldRow('Body height mm', textControl('creator-body-height', 18, { type: 'number', min: 1, step: 0.1 }))}</div>
+            <div class="inline-fields">${fieldRow('Pin pitch mm', textControl('creator-pin-pitch', 2.54, { type: 'number', min: 0.1, step: 0.01 }))}${fieldRow('Row spacing mm', textControl('creator-row-spacing', 6, { type: 'number', min: 0, step: 0.1 }))}</div>
+          </div>
           <div class="modal-panel-title">Dynamic pin matrix <button type="button" class="mini-action" id="creator-add-pin">＋ Add pin</button></div>
           <div class="creator-presets"><span>Start with</span>${[2, 4, 8, 12].map((count) => `<button type="button" class="mini-action" data-pin-preset="${count}">${count} pins</button>`).join('')}<span id="component-creator-summary" class="creator-summary">4 pins · 2 banks</span></div>
           <div class="modal-panel-body table-scroll">
@@ -1667,7 +1977,7 @@ class StudioApplication {
             </tbody></table>
           </div>
         </section>
-        <section class="modal-panel"><div class="modal-panel-title">Live geometry preview</div><div id="component-preview" class="preview-canvas"></div><div class="modal-panel-body"><div class="callout">The component body grows from its title, pin labels, functions, banks, row heights, and padding. Port identities remain stable after instantiation.</div></div></section>
+        <section class="modal-panel"><div class="modal-panel-title">Logical schematic symbol</div><div id="component-preview" class="preview-canvas"></div><div class="modal-panel-title">Mate-side / wire-side footprint</div><div id="mechanical-preview" class="mechanical-preview"></div><div class="modal-panel-body"><div class="callout">Logical port identities link both mechanical faces, while their coordinates and orientation remain independent from the schematic symbol.</div></div></section>
       </div>`;
     const saved = await this.modal.open<LibraryComponent>({
       title: 'Component Creator',
@@ -1798,9 +2108,12 @@ class StudioApplication {
           ${fieldRow('Kind', selectControl('cable-kind', 'multi-core', ['multi-core', 'twisted-pair', 'shielded-twisted-pair', 'coaxial', 'ribbon']))}
           ${fieldRow('Outer diameter mm', textControl('cable-diameter', 6, { type: 'number', min: 0, step: 0.1 }))}
           ${fieldRow('Impedance Ω', textControl('cable-impedance', '', { type: 'number', min: 0, step: 1 }))}
+          ${fieldRow('Shield construction', selectControl('cable-shield-kind', 'none', ['none', 'foil', 'braid', 'foil-and-braid']))}
+          ${fieldRow('Drain conductor', `<input id="cable-drain" class="form-control" type="checkbox" />`)}
           ${fieldRow('Tags', textControl('cable-tags', 'custom, cable'))}
         </div></section>
         <section class="modal-panel"><div class="modal-panel-title">Cores <button type="button" class="mini-action" id="cable-add-core">＋ Add core</button></div><div class="creator-presets"><span>Core preset</span>${[2, 4, 8, 12].map((count) => `<button type="button" class="mini-action" data-core-preset="${count}">${count} core</button>`).join('')}<span id="cable-creator-summary" class="creator-summary">4 cores</span></div><div class="modal-panel-body table-scroll"><table class="data-table pin-editor-table"><thead><tr><th>Label</th><th>Color</th><th>Stripe</th><th>AWG</th><th></th></tr></thead><tbody id="cable-core-body">${[0, 1, 2, 3].map((index) => this.cableCoreRow(index)).join('')}</tbody></table></div><div class="modal-panel-body"><div id="cable-preview" class="cable-preview"></div></div></section>
+        <section class="modal-panel cable-electrical-panel"><div class="modal-panel-title">Electrical construction validation</div><div class="creator-presets"><span>Color sequence</span>${Object.keys(CABLE_COLOR_SEQUENCES).map((name) => `<button type="button" class="mini-action" data-color-sequence="${name}">${name.toUpperCase()}</button>`).join('')}</div><div id="cable-validation" class="modal-panel-body validation-summary"></div></section>
       </div>`;
     const saved = await this.modal.open<LibraryCable>({
       title: 'Cable Creator',
@@ -1814,8 +2127,21 @@ class StudioApplication {
           const rows = [...root.querySelectorAll<HTMLTableRowElement>('[data-cable-core-row]')];
           preview.innerHTML = rows.map((row) => `<div><span style="--core:${escapeAttribute(query<HTMLInputElement>('.core-color', row).value)};--stripe:${escapeAttribute(query<HTMLInputElement>('.core-stripe', row).value)}"></span><strong>${escapeHtml(query<HTMLInputElement>('.core-label', row).value || 'CORE')}</strong><small>${escapeHtml(query<HTMLInputElement>('.core-awg', row).value)} AWG</small></div>`).join('');
           query<HTMLElement>('#cable-creator-summary', root).textContent = `${rows.length} core${rows.length === 1 ? '' : 's'}`;
+          const kind = query<HTMLSelectElement>('#cable-kind', root).value;
+          const shield = query<HTMLSelectElement>('#cable-shield-kind', root).value;
+          const drain = query<HTMLInputElement>('#cable-drain', root).checked;
+          const impedance = Number(query<HTMLInputElement>('#cable-impedance', root).value);
+          const issues: string[] = [];
+          if ((kind === 'coaxial' || kind.includes('twisted-pair')) && !(impedance > 0)) issues.push('Specify a positive characteristic impedance.');
+          if (kind.includes('shielded') && shield === 'none') issues.push('Shielded construction requires a shield type.');
+          if (drain && shield === 'none') issues.push('A drain conductor requires a foil or braid shield.');
+          if (kind.includes('twisted-pair') && rows.length % 2) issues.push('Twisted-pair construction requires an even core count.');
+          query<HTMLElement>('#cable-validation', root).innerHTML = issues.length
+            ? `<div class="callout warning"><strong>Check ${issues.length} item${issues.length === 1 ? '' : 's'}</strong><br>${issues.map(escapeHtml).join('<br>')}</div>`
+            : '<div class="callout success"><strong>Electrical validation passed</strong><br>Construction, shield, drain, impedance, and core count are consistent.</div>';
         };
         root.addEventListener('input', render);
+        root.addEventListener('change', render);
         query<HTMLButtonElement>('#cable-add-core', root).addEventListener('click', () => {
           const tbody = query<HTMLTableSectionElement>('#cable-core-body', root);
           tbody.insertAdjacentHTML('beforeend', this.cableCoreRow(tbody.rows.length));
@@ -1824,6 +2150,14 @@ class StudioApplication {
         root.querySelectorAll<HTMLButtonElement>('[data-core-preset]').forEach((button) => button.addEventListener('click', () => {
           const count = Math.max(1, Number(button.dataset.corePreset) || 1);
           query<HTMLTableSectionElement>('#cable-core-body', root).innerHTML = Array.from({ length: count }, (_, index) => this.cableCoreRow(index)).join('');
+          render();
+        }));
+        root.querySelectorAll<HTMLButtonElement>('[data-color-sequence]').forEach((button) => button.addEventListener('click', () => {
+          const colors = CABLE_COLOR_SEQUENCES[button.dataset.colorSequence || 'iec'] || CABLE_COLOR_SEQUENCES.iec;
+          [...root.querySelectorAll<HTMLTableRowElement>('[data-cable-core-row]')].forEach((row, index) => {
+            query<HTMLInputElement>('.core-color', row).value = colors[index % colors.length];
+            query<HTMLInputElement>('.core-stripe', row).value = '#ffffff';
+          });
           render();
         }));
         root.addEventListener('click', (event) => {
@@ -1839,6 +2173,17 @@ class StudioApplication {
         if (!name) throw new Error('Cable name is required.');
         const coreRows = [...root.querySelectorAll<HTMLTableRowElement>('[data-cable-core-row]')];
         if (!coreRows.length) throw new Error('At least one core is required.');
+        const kind = query<HTMLSelectElement>('#cable-kind', root).value;
+        const shieldKind = query<HTMLSelectElement>('#cable-shield-kind', root).value;
+        const drain = query<HTMLInputElement>('#cable-drain', root).checked;
+        const impedance = Number(query<HTMLInputElement>('#cable-impedance', root).value);
+        const labels = coreRows.map((row) => query<HTMLInputElement>('.core-label', row).value.trim());
+        if (new Set(labels).size !== labels.length) throw new Error('Every cable core requires a unique label.');
+        if (coreRows.some((row) => !(Number(query<HTMLInputElement>('.core-awg', row).value) > 0))) throw new Error('Every cable core requires a positive AWG value.');
+        if ((kind === 'coaxial' || kind.includes('twisted-pair')) && !(impedance > 0)) throw new Error('Coaxial and twisted-pair cables require a positive characteristic impedance.');
+        if (kind.includes('shielded') && shieldKind === 'none') throw new Error('Choose a shield construction for a shielded cable.');
+        if (drain && shieldKind === 'none') throw new Error('A drain conductor cannot exist without a shield.');
+        if (kind.includes('twisted-pair') && coreRows.length % 2) throw new Error('Twisted-pair cables require an even number of cores.');
         const item: LibraryCable = {
           id: createId('library-cable'),
           name,
@@ -1846,9 +2191,10 @@ class StudioApplication {
           partNumber: query<HTMLInputElement>('#cable-part-number', root).value.trim(),
           tags: query<HTMLInputElement>('#cable-tags', root).value.split(',').map((value) => value.trim()).filter(Boolean),
           definition: {
-            kind: query<HTMLSelectElement>('#cable-kind', root).value,
+            kind,
             nominalOuterDiameterMm: Math.max(0, Number(query<HTMLInputElement>('#cable-diameter', root).value) || 0),
             impedanceOhm: query<HTMLInputElement>('#cable-impedance', root).value ? Math.max(0, Number(query<HTMLInputElement>('#cable-impedance', root).value)) : undefined,
+            shield: shieldKind === 'none' ? undefined : { kind: shieldKind, drain },
             cores: coreRows.map((row, index) => ({
               id: `core-${index + 1}`,
               label: query<HTMLInputElement>('.core-label', row).value.trim() || String(index + 1),

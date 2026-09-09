@@ -110,3 +110,7 @@ Sources: [QElectroTech](https://qelectrotech.org/), [QElectroTech documentation]
 3. Add cable shield/drain and standard color-sequence presets with explicit electrical validation.
 4. Add an assembly synchronization diff that explains added, changed, detached, and conflicted entities before applying updates.
 5. Benchmark RouteCore's own engine at 1k, 10k, and 50k entities and introduce dependency-scoped rerouting only where profiling justifies it.
+
+## Follow-up implementation
+
+The five priorities above are now implemented: query-backed drawing primitives, independent mate/wire-side footprints, shield/drain/color cable construction validation, preview-before-apply assembly synchronization, and a [1k/10k/50k RouteCore engine benchmark](./EDITOR_CORE_BENCHMARK.md). Assembly Builder also gained a persisted 3D product-fit projection; its research, architecture, implemented controls, and staged autorouting plan are documented in [3D_CABLE_ROUTING_STUDY.md](./3D_CABLE_ROUTING_STUDY.md).

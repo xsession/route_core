@@ -27,7 +27,7 @@ function securityHeaders(response) {
   response.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), payment=(), usb=()');
   response.setHeader(
     'Content-Security-Policy',
-    "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'",
+    "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' data: blob:; font-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'",
   );
   response.setHeader('Cross-Origin-Resource-Policy', 'same-origin');
 }
@@ -150,7 +150,7 @@ async function handleApi(service, request, response, url) {
       selectedEntities: [],
     });
     const editor = project().loadEditorDocument(state);
-    jsonResponse(response, 200, { workspace: state, editor });
+    jsonResponse(response, 200, { workspace: state, editor, drawingElements: project().listDrawingElements(editor.modelId, editor.pageId) });
     return true;
   }
   if (method === 'POST' && path === '/api/project/checkpoint') {
@@ -190,6 +190,32 @@ async function handleApi(service, request, response, url) {
   }
   if (method === 'POST' && path === '/api/project/generate-assembly') {
     jsonResponse(response, 201, project().generateAssembly(await readBody(request)));
+    return true;
+  }
+  if (method === 'GET' && path === '/api/project/drawing-elements') {
+    jsonResponse(response, 200, project().listDrawingElements(
+      url.searchParams.get('modelId') || undefined,
+      url.searchParams.get('pageId') || undefined,
+    ));
+    return true;
+  }
+  if (method === 'PUT' && path === '/api/project/drawing-elements') {
+    jsonResponse(response, 200, project().saveDrawingElement(await readBody(request)));
+    return true;
+  }
+  const drawingElementId = routeId(path, '/api/project/drawing-elements/');
+  if (method === 'DELETE' && drawingElementId) {
+    jsonResponse(response, 200, { deleted: project().deleteDrawingElement(drawingElementId) });
+    return true;
+  }
+  if (method === 'POST' && path === '/api/project/assembly-sync/preview') {
+    const body = await readBody(request);
+    jsonResponse(response, 200, project().previewAssemblySync(body.assemblyModelId));
+    return true;
+  }
+  if (method === 'POST' && path === '/api/project/assembly-sync/apply') {
+    const body = await readBody(request);
+    jsonResponse(response, 200, project().applyAssemblySync(body.syncRecordId));
     return true;
   }
   if (method === 'GET' && path === '/api/project/bom') {

@@ -87,6 +87,24 @@ test('project database supports editor persistence, revisions, BOM, assemblies, 
     });
     assert.equal(assembly.models.filter((model) => model.kind === 'assembly').length, 1);
     assert.equal(assembly.pages.filter((page) => page.modelId === assembly.workspace.activeModelId).length, 2);
+    assert.equal(assembly.drawingElements.filter((element) => ['title-block', 'bom-table', 'wire-schedule'].includes(element.kind)).length, 3);
+    const dimension = project.saveDrawingElement({
+      modelId: assembly.workspace.activeModelId,
+      pageId: assembly.workspace.activePageId,
+      kind: 'dimension',
+      x: 100,
+      y: 80,
+      width: 220,
+      height: 40,
+    });
+    assert.equal(dimension.kind, 'dimension');
+    assert.equal(project.listDrawingElements(assembly.workspace.activeModelId, assembly.workspace.activePageId).length, 4);
+
+    const syncPreview = project.previewAssemblySync(assembly.workspace.activeModelId);
+    assert.ok(syncPreview.counts.added >= 1);
+    const syncResult = project.applyAssemblySync(syncPreview.id);
+    assert.equal(syncResult.state, 'applied');
+    assert.equal(syncResult.workspace.workspace.activeViewKind, 'layout');
 
     for (const definition of availableExports()) {
       const output = generateExport(project, definition.id, {

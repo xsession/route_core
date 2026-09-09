@@ -3,7 +3,7 @@
 **Document ID:** RouteCore-ROUTE-001  
 **Revision:** 1.0  
 **Status:** implementation reference  
-**Companion code:** `packages/harness-editor-core/src/routing.ts`, `geometry.ts`, `colors.ts`, and `svg.ts`
+**Companion code:** `references/editor-core/src/routing.ts`, `geometry.ts`, `colors.ts`, and `svg.ts`
 
 ## 1. Purpose
 

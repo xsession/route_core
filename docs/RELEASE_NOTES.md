@@ -16,7 +16,7 @@ Version 0.4.0 adopts **RouteCore** as the permanent project and product name. Th
 | Portable project example | `RouteCore-Demonstration.routecore` |
 | Application home variable | `ROUTECORE_HOME` |
 | Default non-portable home | `~/.routecore` |
-| SVG namespace | `routecore-*`, `data-routecore-schema` |
+| SVG namespace | `editor-core-*`, `data-editor-core-schema` |
 | Project interchange schema | `routecore-project-interchange/1` |
 | Netlist schema | `routecore-netlist/1` |
 

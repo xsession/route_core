@@ -1,8 +1,11 @@
 # RouteCore Offline Studio 0.4.0 — Validation Report
 
-Validation date: 2026-08-26  
-Runtime used: Node.js 22.16.0  
-Editor-core package: `@routecore/harness-editor-core` 0.3.0  
+Validation date: 2026-09-09
+
+Runtime used: Node.js 22.20.0
+
+Editor core: `@xsession/editor-core` 0.4.0 via `@routecore/harness-editor-core` 0.3.0 compatibility distribution
+
 Primary project extension: `.routecore`
 
 ## Result summary
@@ -17,9 +20,11 @@ Primary project extension: `.routecore`
 | Strict TypeScript editor-core build | Passed |
 | Strict TypeScript application frontend build | Passed |
 | Server and packaging-script syntax checks | Passed |
-| Integrated application/API/database/security/migration tests | **8 passed, 0 failed** |
+| Integrated application/API/database/security/migration tests | **10 passed, 0 failed** |
 | Editor-engine tests | **63 passed, 0 failed** |
-| Total automated tests | **71 passed, 0 failed** |
+| Compatibility-package tests | **1 passed, 0 failed** |
+| Advanced performance self-test | Passed |
+| Total `node:test` tests | **74 passed, 0 failed** |
 | Mixed-side component geometry regression | Passed |
 | Dark-theme label contrast regression | Passed |
 | Database command-history checkout | Passed |
@@ -44,13 +49,13 @@ The branding/migration suite verifies that:
 
 - the product identity is `RouteCore` and the application title is `RouteCore Offline Studio`;
 - the root package is `routecore-offline-studio`;
-- the reusable editor package is `@routecore/harness-editor-core`;
+- the reusable editor is `@xsession/editor-core`, with `@routecore/harness-editor-core` retained as a compatibility distribution;
 - new paths receive the `.routecore` extension;
 - `.routecore` and legacy `.ohcad` paths are both recognized;
 - opening a legacy `.ohcad` project does not rename, copy, or convert it;
 - new project-interchange exports use `routecore-project-interchange/1`;
 - new connectivity exports use `routecore-netlist/1`;
-- new SVG output uses `data-routecore-schema="1"` and `routecore-*` layer identifiers;
+- new SVG output uses generic `data-editor-core-schema="1"` and `editor-core-*` layer identifiers;
 - the SQLite application marker is `1381253970` (`0x52544352`, `RTCR`);
 - the active browser shell shows RouteCore branding and does not show the former working display name;
 - `ROUTECORE_HOME` is the canonical application-home override;

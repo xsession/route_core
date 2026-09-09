@@ -2416,7 +2416,7 @@ Before coding starts:
 
 The detailed normative specification for component geometry, pin-bank build-up, port frames, wire endpoint attachment, route patterns, obstacle routing, bend radii, crossings, labels, snapping, hit testing, direct manipulation, preview transactions, feedback timing, accessibility, and host integration is provided in `EDITOR_INTERACTION_SPECIFICATION.md`.
 
-A buildable framework-neutral reference implementation is provided in `packages/harness-editor-core`. The module is strict TypeScript, ESM, dependency-free at runtime, and designed for offline use. It supplies:
+A buildable framework-neutral reference implementation is provided by the `references/editor-core` submodule and synchronized through `packages/harness-editor-core`. The module is strict TypeScript, ESM, dependency-free by default at runtime, and designed for offline use. It supplies:
 
 - Dynamic component geometry driven by titles, subtitles, pin labels/functions, pin banks, visibility, connection state, minimum/manual sizing, rotation, and mirroring.
 - Stable port IDs and explicit `prevent`, `detach`, and `remap-by-label` policies when a component edit removes connected ports.
@@ -2458,11 +2458,12 @@ The TypeScript package is a reference editor kernel, not the final RouteCore app
 - `EDITOR_RESPONSE_MATRIX.md` is the gesture-by-gesture acquire/preview/commit/cancel checklist.
 - `ROUTING_PATTERN_CATALOG.md` is the focused route, radius, crossing, and wire-pattern reference.
 - `TYPESCRIPT_MODULE_GUIDE.md` is the reusable-module integration guide.
-- `packages/harness-editor-core/src` is the reusable TypeScript source.
-- `packages/harness-editor-core/dist` is the compiled ESM and declaration output.
-- `packages/harness-editor-core/test` is the executable editor regression suite.
+- `references/editor-core/src` is the reusable TypeScript source.
+- `references/editor-core/editor-core` is the compiled ESM and declaration output.
+- `references/editor-core/test` and `references/editor-core/tests` are the semantic and advanced editor regression suites.
+- `packages/harness-editor-core/dist` is the synchronized RouteCore compatibility distribution.
 - `packages/harness-editor-core/examples/browser` is a local browser-host example.
-- `packages/harness-editor-core/docs` contains API, host integration, and behavior matrices.
+- `references/editor-core/docs` contains API, host integration, behavior, performance, and capability-boundary documentation.
 
 ---
 
@@ -2532,7 +2533,8 @@ These are an independent proposal and fully configurable.
 - `EDITOR_RESPONSE_MATRIX.md`: complete user-action response and failure/cancel matrix.
 - `ROUTING_PATTERN_CATALOG.md`: route-pattern, radius, crossing, fan-out, and wire-color reference.
 - `TYPESCRIPT_MODULE_GUIDE.md`: editor-module integration examples and host patterns.
-- `packages/harness-editor-core`: reusable strict TypeScript editor kernel, tests, documentation, browser demo, and compiled output.
+- `references/editor-core`: reusable strict TypeScript editor kernel, tests, documentation, performance runtimes, benchmarks, and compiled output.
+- `packages/harness-editor-core`: synchronized RouteCore compatibility distribution and branded examples.
 - `EDITOR_SCHEMA_MIGRATION_0002.sql`: normalized visual-editor persistence extension.
 - `EDITOR_COMMANDS.schema.json`: editor command-protocol extension.
 - `VALIDATION_REPORT.md` and `VALIDATION_RESULTS.json`: executable build, test, schema, rendering, and packaging evidence.
@@ -2543,4 +2545,3 @@ These are an independent proposal and fully configurable.
 - `ACCEPTANCE_TESTS.md`: implementation and release acceptance matrix.
 - `EVIDENCE_MATRIX.md`: public-source traceability and clean-room classification.
 - `README.md`: package orientation.
-

@@ -6,6 +6,7 @@ import { fileURLToPath } from 'node:url';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const packageVersion = JSON.parse(readFileSync(join(root, 'package.json'), 'utf8')).version;
+const tscCommand = process.platform === 'win32' ? 'tsc.cmd' : 'tsc';
 
 function run(command, args, options = {}) {
   const result = spawnSync(command, args, { cwd: root, stdio: 'inherit', ...options });
@@ -24,17 +25,15 @@ function filesUnder(directory) {
   return output;
 }
 
-console.log('Building reusable editor core…');
-run('tsc', ['-p', 'packages/harness-editor-core/tsconfig.json']);
-
-const vendor = join(root, 'apps/studio/public/vendor/editor-core');
-rmSync(vendor, { recursive: true, force: true });
-mkdirSync(dirname(vendor), { recursive: true });
-cpSync(join(root, 'packages/harness-editor-core/dist'), vendor, { recursive: true });
+console.log('Building authoritative editor-core submodule…');
+run(tscCommand, ['-p', 'references/editor-core/tsconfig.json'], { shell: process.platform === 'win32' });
+run(process.execPath, ['references/editor-core/scripts/sync-advanced-declarations.mjs']);
+console.log('Synchronizing editor-core runtime…');
+run(process.execPath, ['scripts/sync-editor-core.mjs']);
 
 console.log('Building offline studio frontend…');
 rmSync(join(root, 'apps/studio/public/js'), { recursive: true, force: true });
-run('tsc', ['-p', 'apps/studio/tsconfig.json']);
+run(tscCommand, ['-p', 'apps/studio/tsconfig.json'], { shell: process.platform === 'win32' });
 
 console.log('Checking server modules…');
 for (const file of filesUnder(join(root, 'apps/studio/server')).filter((path) => extname(path) === '.mjs')) {
@@ -66,6 +65,7 @@ const manifest = {
   builtAt: new Date().toISOString(),
   node: process.version,
   editorCoreFiles: filesUnder(join(root, 'packages/harness-editor-core/dist')).length,
+  editorCoreSource: 'references/editor-core/editor-core',
   frontendFiles: filesUnder(join(root, 'apps/studio/public/js')).length,
   runtimeNetworkPolicy: 'loopback-only',
   externalRuntimeDependencies: 0,

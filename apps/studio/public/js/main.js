@@ -260,6 +260,11 @@ class StudioApplication {
             if (button)
                 void this.switchModel(button.dataset.modelId);
         });
+        byId('surface-nav').addEventListener('click', (event) => {
+            const button = event.target.closest('[data-surface]');
+            if (button)
+                void this.openAuthoringSurface(button.dataset.surface);
+        });
         byId('view-tabs').addEventListener('click', (event) => {
             const button = event.target.closest('[data-page-id]');
             if (button)
@@ -338,6 +343,7 @@ class StudioApplication {
         byId('zoom-readout').textContent = `${Math.round(viewport.zoom * 100)}%`;
     }
     renderAll() {
+        this.renderSurfaceNavigation();
         this.renderModelTabs();
         this.renderViewTabs();
         this.renderBreadcrumb();
@@ -358,19 +364,56 @@ class StudioApplication {
         <span class="model-tab-name">${escapeHtml(model.name)}</span>
       </button>`).join('');
     }
+    renderSurfaceNavigation() {
+        const model = this.workspace.models.find((value) => value.id === this.workspace.workspace.activeModelId);
+        const active = model?.kind === 'assembly' ? 'assembly' : 'project';
+        document.querySelectorAll('[data-surface]').forEach((button) => {
+            const selected = button.dataset.surface === active;
+            button.classList.toggle('active', selected);
+            if (selected)
+                button.setAttribute('aria-current', 'page');
+            else
+                button.removeAttribute('aria-current');
+        });
+    }
+    async openAuthoringSurface(surface) {
+        if (surface === 'component') {
+            await this.componentCreatorDialog();
+            return;
+        }
+        if (surface === 'cable') {
+            await this.cableCreatorDialog();
+            return;
+        }
+        const modelKind = surface === 'project' ? 'plan' : surface;
+        const model = this.workspace.models.find((value) => value.kind === modelKind);
+        if (model) {
+            await this.switchModel(model.id);
+            return;
+        }
+        if (surface === 'assembly') {
+            const plan = this.workspace.models.find((value) => value.kind === 'plan');
+            if (plan && plan.id !== this.workspace.workspace.activeModelId)
+                await this.switchModel(plan.id);
+            await this.generateAssemblyDialog();
+        }
+    }
     renderViewTabs() {
         const root = byId('view-tabs');
         const pages = this.workspace.pages.filter((page) => page.modelId === this.workspace.workspace.activeModelId);
+        const model = this.workspace.models.find((value) => value.id === this.workspace.workspace.activeModelId);
         root.innerHTML = pages.map((page) => `
       <button class="view-tab${page.id === this.workspace.workspace.activePageId && page.viewKind === this.workspace.workspace.activeViewKind ? ' active' : ''}"
         data-model-id="${escapeAttribute(page.modelId)}" data-page-id="${escapeAttribute(page.id)}" data-view-kind="${escapeAttribute(page.viewKind)}">
-        ${page.viewKind === 'schematic' ? 'Schematic' : page.viewKind === 'layout' ? 'Layout' : escapeHtml(page.name)}
+        <span class="view-tab-icon" aria-hidden="true">${page.viewKind === 'schematic' ? '⌁' : '⌑'}</span>${page.viewKind === 'schematic' ? 'Schematic' : page.viewKind === 'layout' ? 'Layout' : escapeHtml(page.name)}
+        <span class="view-tab-purpose">${page.viewKind === 'schematic' ? 'pin-level' : model?.kind === 'assembly' ? 'drawing' : 'topology'}</span>
       </button>`).join('');
     }
     renderBreadcrumb() {
         const model = this.workspace.models.find((value) => value.id === this.workspace.workspace.activeModelId);
         const page = this.workspace.pages.find((value) => value.id === this.workspace.workspace.activePageId);
-        byId('breadcrumb').innerHTML = `<strong>${escapeHtml(this.workspace.meta.name)}</strong> / ${escapeHtml(model?.name || 'Model')} / ${escapeHtml(page?.name || this.workspace.workspace.activeViewKind)}`;
+        const surface = model?.kind === 'assembly' ? 'Assembly Builder' : 'Project Builder';
+        byId('breadcrumb').innerHTML = `<strong>${surface}</strong> · ${escapeHtml(this.workspace.meta.name)} / ${escapeHtml(model?.name || 'Model')} / ${escapeHtml(page?.name || this.workspace.workspace.activeViewKind)}`;
     }
     renderLeftPanel() {
         if (this.activeLeftTab === 'explorer')
@@ -1713,7 +1756,11 @@ class StudioApplication {
         if (!preview)
             return;
         try {
-            const definition = buildCustomLibraryComponent(this.collectCustomComponentInput(root));
+            const input = this.collectCustomComponentInput(root);
+            const definition = buildCustomLibraryComponent(input);
+            const summary = queryOptional('#component-creator-summary', root);
+            if (summary)
+                summary.textContent = `${input.ports.length} pins · ${new Set(input.ports.map((port) => port.side)).size} banks`;
             const document = createEmptyDocument('component-preview');
             const component = structuredClone(definition.component);
             component.position = { x: 40, y: 40 };
@@ -1747,6 +1794,7 @@ class StudioApplication {
             ${fieldRow('Tags', textControl('creator-tags', 'custom, connector'), { stacked: true })}
           </div>
           <div class="modal-panel-title">Dynamic pin matrix <button type="button" class="mini-action" id="creator-add-pin">＋ Add pin</button></div>
+          <div class="creator-presets"><span>Start with</span>${[2, 4, 8, 12].map((count) => `<button type="button" class="mini-action" data-pin-preset="${count}">${count} pins</button>`).join('')}<span id="component-creator-summary" class="creator-summary">4 pins · 2 banks</span></div>
           <div class="modal-panel-body table-scroll">
             <table class="data-table pin-editor-table"><thead><tr><th>Label</th><th>Function</th><th>Side</th><th>Electrical</th><th>Max</th><th></th></tr></thead><tbody id="creator-pin-body">
               ${[0, 1, 2, 3].map((index) => this.componentPinRow(index, { side: index < 2 ? 'west' : 'east' })).join('')}
@@ -1770,6 +1818,12 @@ class StudioApplication {
                     tbody.insertAdjacentHTML('beforeend', this.componentPinRow(tbody.rows.length));
                     this.renderCreatorPreview(root);
                 });
+                root.querySelectorAll('[data-pin-preset]').forEach((button) => button.addEventListener('click', () => {
+                    const count = Math.max(1, Number(button.dataset.pinPreset) || 1);
+                    const tbody = query('#creator-pin-body', root);
+                    tbody.innerHTML = Array.from({ length: count }, (_, index) => this.componentPinRow(index, { side: index < Math.ceil(count / 2) ? 'west' : 'east' })).join('');
+                    this.renderCreatorPreview(root);
+                }));
                 root.addEventListener('click', (event) => {
                     const button = event.target.closest('[data-pin-delete]');
                     if (button) {
@@ -1886,7 +1940,7 @@ class StudioApplication {
           ${fieldRow('Impedance Ω', textControl('cable-impedance', '', { type: 'number', min: 0, step: 1 }))}
           ${fieldRow('Tags', textControl('cable-tags', 'custom, cable'))}
         </div></section>
-        <section class="modal-panel"><div class="modal-panel-title">Cores <button type="button" class="mini-action" id="cable-add-core">＋ Add core</button></div><div class="modal-panel-body table-scroll"><table class="data-table pin-editor-table"><thead><tr><th>Label</th><th>Color</th><th>Stripe</th><th>AWG</th><th></th></tr></thead><tbody id="cable-core-body">${[0, 1, 2, 3].map((index) => this.cableCoreRow(index)).join('')}</tbody></table></div><div class="modal-panel-body"><div id="cable-preview" class="cable-preview"></div></div></section>
+        <section class="modal-panel"><div class="modal-panel-title">Cores <button type="button" class="mini-action" id="cable-add-core">＋ Add core</button></div><div class="creator-presets"><span>Core preset</span>${[2, 4, 8, 12].map((count) => `<button type="button" class="mini-action" data-core-preset="${count}">${count} core</button>`).join('')}<span id="cable-creator-summary" class="creator-summary">4 cores</span></div><div class="modal-panel-body table-scroll"><table class="data-table pin-editor-table"><thead><tr><th>Label</th><th>Color</th><th>Stripe</th><th>AWG</th><th></th></tr></thead><tbody id="cable-core-body">${[0, 1, 2, 3].map((index) => this.cableCoreRow(index)).join('')}</tbody></table></div><div class="modal-panel-body"><div id="cable-preview" class="cable-preview"></div></div></section>
       </div>`;
         const saved = await this.modal.open({
             title: 'Cable Creator',
@@ -1897,7 +1951,9 @@ class StudioApplication {
             onMount: ({ body: root }) => {
                 const render = () => {
                     const preview = query('#cable-preview', root);
-                    preview.innerHTML = [...root.querySelectorAll('[data-cable-core-row]')].map((row) => `<div><span style="--core:${escapeAttribute(query('.core-color', row).value)};--stripe:${escapeAttribute(query('.core-stripe', row).value)}"></span><strong>${escapeHtml(query('.core-label', row).value || 'CORE')}</strong><small>${escapeHtml(query('.core-awg', row).value)} AWG</small></div>`).join('');
+                    const rows = [...root.querySelectorAll('[data-cable-core-row]')];
+                    preview.innerHTML = rows.map((row) => `<div><span style="--core:${escapeAttribute(query('.core-color', row).value)};--stripe:${escapeAttribute(query('.core-stripe', row).value)}"></span><strong>${escapeHtml(query('.core-label', row).value || 'CORE')}</strong><small>${escapeHtml(query('.core-awg', row).value)} AWG</small></div>`).join('');
+                    query('#cable-creator-summary', root).textContent = `${rows.length} core${rows.length === 1 ? '' : 's'}`;
                 };
                 root.addEventListener('input', render);
                 query('#cable-add-core', root).addEventListener('click', () => {
@@ -1905,6 +1961,11 @@ class StudioApplication {
                     tbody.insertAdjacentHTML('beforeend', this.cableCoreRow(tbody.rows.length));
                     render();
                 });
+                root.querySelectorAll('[data-core-preset]').forEach((button) => button.addEventListener('click', () => {
+                    const count = Math.max(1, Number(button.dataset.corePreset) || 1);
+                    query('#cable-core-body', root).innerHTML = Array.from({ length: count }, (_, index) => this.cableCoreRow(index)).join('');
+                    render();
+                }));
                 root.addEventListener('click', (event) => {
                     if (event.target.closest('[data-core-delete]')) {
                         event.target.closest('tr')?.remove();
@@ -2181,11 +2242,12 @@ class StudioApplication {
           <div class="callout">Generation creates independent Layout and Schematic projections with stable origin mappings back to this Plan.</div>
         </div></section>
         <section class="modal-panel"><div class="modal-panel-title">Included topology</div><div class="modal-panel-body assembly-selection-list">
+          <div class="selection-toolbar"><button type="button" class="mini-action" data-assembly-select="all">Select all</button><button type="button" class="mini-action" data-assembly-select="none">Clear</button><span id="assembly-selection-count"></span></div>
           ${document.componentOrder.map((id) => {
             const component = document.components[id];
             return `<label class="check-row"><input type="checkbox" data-assembly-component="${escapeAttribute(id)}"${checked(useSelection ? selectedComponents.has(id) : true)} /><span><strong>${escapeHtml(component.designator)}</strong><small>${escapeHtml(component.labels.title || component.kind)} · ${component.ports.length} ports</small></span></label>`;
         }).join('') || '<div class="panel-empty">No components exist.</div>'}
-          <div class="assembly-wire-summary">Connected conductors are included when both endpoints belong to selected components. Explicitly selected conductors are always considered.</div>
+          <div id="assembly-selection-summary" class="assembly-wire-summary"></div>
         </div></section>
       </div>`;
         const result = await this.modal.open({
@@ -2194,6 +2256,32 @@ class StudioApplication {
             body,
             size: 'large',
             confirmLabel: 'Generate assembly',
+            onMount: ({ body: root }) => {
+                const updateSummary = () => {
+                    const componentIds = [...root.querySelectorAll('[data-assembly-component]:checked')].map((input) => input.dataset.assemblyComponent);
+                    const included = new Set(componentIds);
+                    const wireCount = document.wireOrder.filter((id) => {
+                        if (selectedWires.has(id))
+                            return true;
+                        const wire = document.wires[id];
+                        const sourceIncluded = wire.source.kind !== 'port' || included.has(wire.source.componentId);
+                        const targetIncluded = wire.target.kind !== 'port' || included.has(wire.target.componentId);
+                        return sourceIncluded && targetIncluded;
+                    }).length;
+                    query('#assembly-selection-count', root).textContent = `${componentIds.length}/${document.componentOrder.length} components`;
+                    query('#assembly-selection-summary', root).innerHTML = `<strong>${componentIds.length} components · ${wireCount} conductors</strong><br />Connected conductors are included when both endpoints belong to the selection. Explicitly selected conductors remain included.`;
+                };
+                root.querySelectorAll('[data-assembly-select]').forEach((button) => button.addEventListener('click', () => {
+                    const checkedValue = button.dataset.assemblySelect === 'all';
+                    root.querySelectorAll('[data-assembly-component]').forEach((input) => { input.checked = checkedValue; });
+                    updateSummary();
+                }));
+                root.addEventListener('change', (event) => {
+                    if (event.target.matches('[data-assembly-component]'))
+                        updateSummary();
+                });
+                updateSummary();
+            },
             onConfirm: async ({ body: root }) => {
                 await this.saveNow(true);
                 const componentIds = [...root.querySelectorAll('[data-assembly-component]:checked')].map((input) => input.dataset.assemblyComponent);
@@ -2378,7 +2466,7 @@ class StudioApplication {
         await this.modal.open({
             title: app.name,
             subtitle: `Version ${app.version}`,
-            body: `<div class="about-panel"><div class="about-mark">RC</div><div><h3>Offline-first wiring harness CAD</h3><p>Visual topology, synchronized model projections, deterministic routing, local component and cable libraries, BOM assignments, revisions, manufacturing exports, and SQLite persistence.</p><dl><dt>Network policy</dt><dd>${escapeHtml(app.networkPolicy)}</dd><dt>Project format</dt><dd>${escapeHtml(app.projectFormat)}</dd><dt>Editor core</dt><dd>@routecore/harness-editor-core 0.3.0</dd><dt>Project file</dt><dd class="mono">${escapeHtml(this.workspace.path)}</dd></dl></div></div>`,
+            body: `<div class="about-panel"><div class="about-mark">RC</div><div><h3>Offline-first wiring harness CAD</h3><p>Visual topology, synchronized model projections, deterministic routing, local component and cable libraries, BOM assignments, revisions, manufacturing exports, and SQLite persistence.</p><dl><dt>Network policy</dt><dd>${escapeHtml(app.networkPolicy)}</dd><dt>Project format</dt><dd>${escapeHtml(app.projectFormat)}</dd><dt>Editor core</dt><dd>@xsession/editor-core 0.4.0</dd><dt>Project file</dt><dd class="mono">${escapeHtml(this.workspace.path)}</dd></dl></div></div>`,
             size: 'large',
             hideFooter: true,
         });

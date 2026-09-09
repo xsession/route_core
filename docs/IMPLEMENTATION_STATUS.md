@@ -40,7 +40,7 @@ It is also not yet presented as a production-certified replacement for every wor
 ## Runtime architecture
 
 - Frontend: strict TypeScript compiled to browser-native ES modules.
-- Editor engine: framework-neutral `@routecore/harness-editor-core` TypeScript package.
+- Editor engine: framework-neutral `@xsession/editor-core` submodule, exposed through a thin RouteCore compatibility distribution.
 - Backend: Node.js ES modules and built-in `node:sqlite`.
 - Host: loopback-only HTTP server bound to `127.0.0.1` or `::1`.
 - Runtime dependencies: zero third-party packages.

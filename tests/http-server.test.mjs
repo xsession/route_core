@@ -88,7 +88,7 @@ test('loopback HTTP application serves secure offline APIs and assets', async ()
     const svg = await fetch(`${base}/api/export/svg`);
     assert.equal(svg.status, 200);
     assert.match(svg.headers.get('content-type') || '', /image\/svg\+xml/);
-    assert.match(await svg.text(), /data-routecore-schema="1"/);
+    assert.match(await svg.text(), /data-editor-core-schema="1"/);
 
     const traversal = await fetch(`${base}/..%2F..%2Fetc%2Fpasswd`);
     assert.notEqual(traversal.status, 200);

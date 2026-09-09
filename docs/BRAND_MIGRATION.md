@@ -16,7 +16,7 @@ This document defines the rename from the former working name to **RouteCore** a
 | Legacy application home | `~/.routecore` | Existing home is reused when the new home has not yet been created. |
 | Browser keys `ohcad.*` | `routecore.*` | Values migrate lazily on first access. |
 | SVG `ohcad-*` identifiers | `routecore-*` identifiers | New renders use only RouteCore identifiers. |
-| `data-ohcad-schema` | `data-routecore-schema` | New SVG exports use the RouteCore data attribute. |
+| `data-ohcad-schema` | `data-editor-core-schema` | SVG exports use the shared editor-core data attribute. |
 | Old JSON schema identifiers | `routecore-project-interchange/1` and `routecore-netlist/1` | New exports use RouteCore identifiers. |
 
 ## Project-file behavior
@@ -70,13 +70,13 @@ The editor-document schema version remains `1`; the package rename does not chan
 New SVG output uses:
 
 ```text
-data-routecore-schema="1"
-routecore-grid-layer
-routecore-wire-layer
-routecore-component-layer
-routecore-label-layer
-routecore-interaction-layer
-routecore-handle-layer
+data-editor-core-schema="1"
+editor-core-grid-layer
+editor-core-wire-layer
+editor-core-component-layer
+editor-core-label-layer
+editor-core-interaction-layer
+editor-core-handle-layer
 ```
 
 Host applications that styled the former internal SVG class names must update their selectors. Semantic `data-component-id`, `data-wire-id`, `data-label-id`, `data-route-handle`, roles, titles, and ARIA labels are unchanged.
@@ -89,7 +89,7 @@ A RouteCore release shall fail validation when any of the following are true:
 - the root or editor-core package exposes the former package namespace;
 - a newly created project defaults to the legacy extension;
 - a legacy `.ohcad` project cannot be opened;
-- an SVG export lacks `data-routecore-schema="1"`;
+- an SVG export lacks `data-editor-core-schema="1"`;
 - project or netlist JSON uses a non-RouteCore schema identifier;
 - the portable launchers fail to use `ROUTECORE_HOME`;
 - generated release filenames retain the former working name.

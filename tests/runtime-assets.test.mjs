@@ -16,6 +16,8 @@ function walk(directory) {
 test('compiled frontend is self-contained and contains no remote runtime dependencies', () => {
   assert.ok(existsSync('apps/studio/public/js/main.js'));
   assert.ok(existsSync('apps/studio/public/vendor/editor-core/index.js'));
+  assert.ok(existsSync('apps/studio/public/vendor/editor-core/performance-engine.js'));
+  assert.ok(existsSync('apps/studio/public/vendor/editor-core/adaptive-spatial.js'));
   const index = readFileSync('apps/studio/public/index.html', 'utf8');
   assert.match(index, /src="\/js\/main\.js"/);
   assert.doesNotMatch(index, /https?:\/\//);
@@ -28,6 +30,14 @@ test('compiled frontend is self-contained and contains no remote runtime depende
   }
 });
 
+test('RouteCore vendors the authoritative editor-core submodule', () => {
+  const build = readFileSync('scripts/build.mjs', 'utf8');
+  const sync = readFileSync('scripts/sync-editor-core.mjs', 'utf8');
+  assert.match(build, /sync-editor-core\.mjs/);
+  assert.match(sync, /references.*editor-core.*editor-core/s);
+  assert.doesNotMatch(build, /packages\/harness-editor-core\/tsconfig\.json/);
+});
+
 test('application exposes the dense editor command surfaces', () => {
   const main = readFileSync('apps/studio/public/js/main.js', 'utf8');
   for (const feature of [
@@ -35,4 +45,17 @@ test('application exposes the dense editor command surfaces', () => {
     'integrityDialog', 'exportsDialog', 'bomDialog', 'openContextMenu', 'handleGlobalKeyDown',
     'data-checkout-command', 'Checkout state',
   ]) assert.match(main, new RegExp(feature));
+});
+
+test('application exposes all four authoring surfaces and guided creator controls', () => {
+  const index = readFileSync('apps/studio/public/index.html', 'utf8');
+  const source = readFileSync('apps/studio/public/src/main.ts', 'utf8');
+  for (const surface of ['project', 'assembly', 'component', 'cable']) {
+    assert.match(index, new RegExp(`data-surface="${surface}"`));
+  }
+  assert.match(source, /openAuthoringSurface/);
+  assert.match(source, /surface === 'project' \? 'plan'/);
+  assert.match(source, /data-pin-preset/);
+  assert.match(source, /data-core-preset/);
+  assert.match(source, /assembly-selection-summary/);
 });

@@ -1,0 +1,3 @@
+[submodule "references/editor-core"]
+	path = references/editor-core
+	url = https://github.com/xsession/editor-core.git

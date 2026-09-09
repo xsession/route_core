@@ -18,6 +18,16 @@ RouteCore Offline Studio is a working offline-first wiring-harness visual editor
 
 Requirements: Node.js 22 or newer. The packaged release already includes compiled frontend and editor-core JavaScript; no `npm install` step is required.
 
+Clone the authoritative editor engine with the repository:
+
+```bash
+git clone --recurse-submodules <routecore-repository-url>
+# Existing checkout:
+git submodule update --init --recursive
+```
+
+`references/editor-core` is the source of truth for reusable editor behavior. RouteCore compiles and vendors its pinned runtime during every build; `packages/harness-editor-core` is only a compatibility distribution. See `references/editor-core/docs/ROUTECORE_CAPABILITY_REVIEW.md` for the ownership boundary.
+
 Portable launchers:
 
 ```text
@@ -61,9 +71,10 @@ npm run demo:project
 
 - `apps/studio/public` — offline browser UI and compiled frontend.
 - `apps/studio/server` — loopback HTTP API, project service, SQLite persistence, and exporters.
-- `packages/harness-editor-core` — reusable TypeScript editor engine.
+- `packages/harness-editor-core` — RouteCore compatibility distribution and examples.
 - `database` — baseline, editor, and application schemas.
 - `docs` — clean-room editor, interaction, routing, and command specifications.
+- `references/editor-core` — authoritative reusable editor engine, tests, docs, and performance runtimes.
 - `tests` — application, database, API, export, security, and offline-runtime tests.
 - `START_HERE.md`, `run.cmd`, `run.sh` — portable release launch path.
 - `docs/VALIDATION_REPORT.md` — release qualification evidence and boundaries.

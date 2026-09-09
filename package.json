@@ -8,7 +8,7 @@
     "build": "node scripts/build.mjs",
     "start": "node apps/studio/server/main.mjs --open",
     "start:no-open": "node apps/studio/server/main.mjs",
-    "test": "node --test tests/*.test.mjs && npm --prefix packages/harness-editor-core test",
+    "test": "node --test tests/*.test.mjs && npm --prefix references/editor-core run test:base && npm --prefix references/editor-core run test:advanced && npm --prefix packages/harness-editor-core test",
     "check": "npm run build && npm test",
     "demo:project": "node scripts/create-demo-project.mjs",
     "package": "node scripts/package.mjs"

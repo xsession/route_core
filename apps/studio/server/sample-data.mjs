@@ -36,6 +36,10 @@ export function createProjectDocument(template = 'sample') {
     return document;
   }
   const document = createSampleDocument();
+  if (document.components.A1) {
+    document.components.A1.labels.subtitle = 'OFFLINE CONTROL UNIT';
+    document.components.A1.labels.manufacturer = 'RouteCore';
+  }
   document.id = 'layout-document';
   document.metadata = { ...(document.metadata || {}), title: 'Demonstration Layout', units: 'mm', template: 'sample' };
   return document;

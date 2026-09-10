@@ -597,7 +597,9 @@ class StudioApplication {
         ${cable ? `<div class="inline-fields">${fieldRow('Diameter mm', textControl('spatial-diameter', cable.diameterMm, { type: 'number', min: 0.1, step: 0.1 }))}${fieldRow('Min bend mm', textControl('spatial-bend-radius', cable.minimumBendRadiusMm, { type: 'number', min: 0.1, step: 0.5 }))}</div>` : ''}
         ${analysis ? `<div class="spatial-metrics"><div><strong>${formatNumber(analysis.lengthMm, 1)}</strong><span>length mm</span></div><div class="${analysis.valid ? 'valid' : 'invalid'}"><strong>${analysis.minimumObservedBendRadiusMm == null ? '—' : formatNumber(analysis.minimumObservedBendRadiusMm, 1)}</strong><span>minimum bend</span></div><div class="${analysis.valid ? 'valid' : 'invalid'}"><strong>${analysis.bendViolations.length}</strong><span>bend issues</span></div><div class="${collisions ? 'invalid' : 'valid'}"><strong>${collisions}</strong><span>clashes</span></div></div>` : ''}
         <div class="button-row start"><button class="secondary-button" data-action="spatial-add-point"${cable ? '' : ' disabled'}>Add control point</button><button class="secondary-button" data-action="spatial-delete-point"${this.spatialSelection.pointIndex == null ? ' disabled' : ''}>Delete point</button></div>
-        <div class="callout${analysis?.valid ? ' success' : ' warning'}">${this.spatialSelection.pointIndex == null ? 'Select a blue control point in the 3D view, then drag the transform gizmo. Endpoints remain attached.' : `Editing control point ${this.spatialSelection.pointIndex + 1}. Red cable geometry marks a minimum-bend-radius violation.`}</div>
+        ${fieldRow('Route clearance mm', textControl('spatial-clearance', 0, { type: 'number', min: 0, step: 1 }))}
+        <div class="button-row start"><button class="primary-button" data-action="spatial-autoroute"${cable ? '' : ' disabled'}>Auto route cable</button><button class="primary-button" data-action="spatial-autoroute-bundle"${state.cableOrder.length >= 2 ? '' : ' disabled'}>Auto route bundle</button></div>
+        <div class="callout${analysis?.valid ? ' success' : ' warning'}">${this.spatialSelection.pointIndex == null ? 'Auto route runs bend-aware A* around the product keep-out volume; bundle route shares trunk segments between cables. Endpoints remain attached.' : `Editing control point ${this.spatialSelection.pointIndex + 1}. Red cable geometry marks a minimum-bend-radius violation.`}</div>
       </div></section>
       <section class="panel-section"><div class="panel-section-header">Documentation viewpoints</div><div class="panel-section-body viewpoint-list">
         ${state.viewpoints.map((viewpoint) => `<button class="secondary-button" data-action="spatial-viewpoint" data-viewpoint-id="${escapeAttribute(viewpoint.id)}">${escapeHtml(viewpoint.name)}</button>`).join('') || '<div class="panel-empty">No saved viewpoints.</div>'}
@@ -1013,6 +1015,9 @@ class StudioApplication {
         }
         this.renderInspector();
     }
+    readSpatialClearanceMm() {
+        return Math.max(0, Number(query('#spatial-clearance', byId('right-content'))?.value ?? 0) || 0);
+    }
     handleDocumentInspectorChange(input) {
         if (input.id === 'project-name-inline' || input.id === 'project-org-inline') {
             void this.updateProjectMeta({
@@ -1361,6 +1366,33 @@ class StudioApplication {
                 case 'spatial-delete-point':
                     this.spatialEditor?.deleteControlPoint();
                     break;
+                case 'spatial-autoroute': {
+                    const cableId = this.spatialSelection.cableId;
+                    if (!cableId)
+                        break;
+                    const result = this.spatialEditor?.autorouteCable(cableId, { clearanceMm: this.readSpatialClearanceMm() });
+                    if (result?.success) {
+                        toast('Cable auto routed', `${result.expansions} A* expansions, ${result.controlPoints.length} control points, minimum bend radius ${result.bendValid ? 'satisfied' : 'at grid limit'}.`, 'success');
+                    }
+                    else {
+                        toast('Auto route failed', result?.reason ? `No feasible path (reason: ${result.reason}). Widen the clearance or adjust endpoints.` : 'Select a cable and load a product first.', 'error');
+                    }
+                    this.renderInspector();
+                    break;
+                }
+                case 'spatial-autoroute-bundle': {
+                    const results = this.spatialEditor?.autorouteBundle({ clearanceMm: this.readSpatialClearanceMm() }) ?? [];
+                    const ok = results.filter((value) => value.success);
+                    const shared = results.reduce((sum, value) => sum + value.sharedVoxelCount, 0);
+                    if (results.length) {
+                        toast(ok.length === results.length ? 'Bundle auto routed' : 'Bundle partially routed', `${ok.length}/${results.length} cables routed, ${shared} shared trunk voxels (branch points created where cables split).`, ok.length ? 'success' : 'error');
+                    }
+                    else {
+                        toast('Bundle auto route unavailable', 'Load a product and add at least two cables first.', 'error');
+                    }
+                    this.renderInspector();
+                    break;
+                }
                 case 'spatial-viewpoint': {
                     const id = target.closest('[data-viewpoint-id]')?.dataset.viewpointId;
                     const viewpoint = this.spatialEditor?.state.viewpoints.find((value) => value.id === id);

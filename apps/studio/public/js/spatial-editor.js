@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { TransformControls } from 'three/addons/controls/TransformControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { analyzeSpatialCable, insertSpatialControlPoint, } from '../vendor/editor-core/index.js';
+import { analyzeSpatialCable, buildSpatialKeepOutVolume, insertSpatialControlPoint, routeSpatialBundle, routeSpatialCable, } from '../vendor/editor-core/index.js';
 export class SpatialHarnessEditor {
     host;
     callbacks;
@@ -22,6 +22,8 @@ export class SpatialHarnessEditor {
     selectionValue = { cableId: null, pointIndex: null };
     clippingPlane = new THREE.Plane(new THREE.Vector3(0, 0, 0), 0);
     productLoadGeneration = 0;
+    productLoaded = false;
+    keepOutCache = new Map();
     constructor(host, callbacks) {
         this.host = host;
         this.callbacks = callbacks;
@@ -162,6 +164,122 @@ export class SpatialHarnessEditor {
         this.applyProductMaterial();
         this.render();
     }
+    /**
+     * Extracts the product's world-space triangles from the loaded GLB scene
+     * (or the built-in fit-check fixture). The model-to-harness transform has
+     * already been applied to the scene matrix, so vertices read back here are
+     * directly in harness mm coordinates for the keep-out volume.
+     */
+    collectProductTriangles(maxTriangles) {
+        this.scene.updateMatrixWorld(true);
+        const output = [];
+        const seen = new Set();
+        const v = new THREE.Vector3();
+        this.productGroup.traverse((object) => {
+            const mesh = object;
+            if (!(mesh instanceof THREE.Mesh))
+                return;
+            const geometry = mesh.geometry;
+            if (seen.has(geometry))
+                return;
+            seen.add(geometry);
+            const position = geometry.getAttribute('position');
+            if (!position)
+                return;
+            const pos = position;
+            const array = pos.array;
+            const itemSize = pos.itemSize;
+            const index = geometry.getIndex();
+            const count = index ? index.count : position.count;
+            for (let face = 0; face < count; face += 3) {
+                if (output.length >= maxTriangles)
+                    return;
+                const ia = index ? index.getX(face) : face;
+                const ib = index ? index.getX(face + 1) : face + 1;
+                const ic = index ? index.getX(face + 2) : face + 2;
+                const oa = ia * itemSize, ob = ib * itemSize, oc = ic * itemSize;
+                mesh.localToWorld(v.set(array[oa], array[oa + 1], array[oa + 2]));
+                const a = { x: v.x, y: v.y, z: v.z };
+                mesh.localToWorld(v.set(array[ob], array[ob + 1], array[ob + 2]));
+                const b = { x: v.x, y: v.y, z: v.z };
+                mesh.localToWorld(v.set(array[oc], array[oc + 1], array[oc + 2]));
+                const c = { x: v.x, y: v.y, z: v.z };
+                output.push({ a, b, c });
+            }
+        });
+        return output;
+    }
+    /**
+     * Builds (and caches) the keep-out volume for the current product geometry
+     * at the requested clearance. Cached per clearance so repeated autoroute
+     * runs with the same margin do not re-triangulate the mesh.
+     */
+    buildKeepOut(clearanceMm, cellSizeMm = 4) {
+        const key = `${clearanceMm}:${cellSizeMm}:${this.productLoadGeneration}`;
+        const cached = this.keepOutCache.get(key);
+        if (cached !== undefined)
+            return cached;
+        const triangles = this.collectProductTriangles(12000);
+        const volume = buildSpatialKeepOutVolume(triangles, { clearanceMm, cellSizeMm, maxTriangles: 12000 });
+        this.keepOutCache.set(key, volume);
+        return volume;
+    }
+    /**
+     * Routes the selected cable around the product keep-out volume using the
+     * bend-aware A* autorouter and applies the result to the cable's
+     * intermediate control points (endpoints stay locked/attached).
+     */
+    autorouteCable(cableId, options = {}) {
+        if (!this.productLoaded)
+            return null;
+        const cable = this.stateValue.cables[cableId];
+        if (!cable || cable.controlPoints.length < 2)
+            return null;
+        const volume = this.buildKeepOut(options.clearanceMm ?? 0);
+        const result = routeSpatialCable(cable, volume, { maxExpansions: 250000 });
+        if (result.success) {
+            this.stateValue.cables[cableId] = {
+                ...cable,
+                controlPoints: result.controlPoints,
+                lockedPointIndices: [0, result.controlPoints.length - 1],
+            };
+            this.rebuildCables();
+            this.emit('autoroute 3D cable');
+        }
+        return result;
+    }
+    /**
+     * Routes the whole harness as a bundle with shared-edge discounts so
+     * cables share trunk segments and create branch points. Applies every
+     * accepted route back onto the cables (endpoints stay locked).
+     */
+    autorouteBundle(options = {}) {
+        if (!this.productLoaded)
+            return [];
+        const cables = this.stateValue.cableOrder.map((id) => this.stateValue.cables[id]).filter(Boolean);
+        if (!cables.length)
+            return [];
+        const volume = this.buildKeepOut(options.clearanceMm ?? 0);
+        const results = routeSpatialBundle(cables, volume, {
+            maxExpansions: 250000,
+            sharedEdgeDiscount: options.sharedEdgeDiscount ?? 0.25,
+        });
+        for (const result of results) {
+            if (!result.success)
+                continue;
+            const cable = this.stateValue.cables[result.cableId];
+            if (!cable)
+                continue;
+            this.stateValue.cables[result.cableId] = {
+                ...cable,
+                controlPoints: result.controlPoints,
+                lockedPointIndices: [0, result.controlPoints.length - 1],
+            };
+        }
+        this.rebuildCables();
+        this.emit('autoroute 3D cable bundle');
+        return results;
+    }
     captureViewpoint(name) {
         const viewpoint = {
             id: `view-${Date.now().toString(36)}`,
@@ -198,6 +316,8 @@ export class SpatialHarnessEditor {
     screenshot() { return this.renderer.domElement.toDataURL('image/png'); }
     rebuildProduct() {
         const loadGeneration = ++this.productLoadGeneration;
+        this.productLoaded = false;
+        this.keepOutCache.clear();
         this.disposeObjectTree(this.productGroup);
         this.productGroup.clear();
         const model = this.stateValue.productModel;
@@ -210,6 +330,7 @@ export class SpatialHarnessEditor {
                 obstacle.position.set(position[0], position[1], position[2]);
                 this.productGroup.add(obstacle);
             }
+            this.productLoaded = true;
             this.render();
             return;
         }
@@ -229,10 +350,13 @@ export class SpatialHarnessEditor {
                 gltf.scene.applyMatrix4(new THREE.Matrix4().multiplyMatrices(placement, sourceUnit));
                 this.productGroup.add(gltf.scene);
                 this.applyProductMaterial();
+                this.productLoaded = true;
                 this.fit();
             }, (error) => console.error(error));
         }).catch((error) => console.error(error));
     }
+    /** True when the current product geometry (fixture or loaded GLB) is present. */
+    get isProductReady() { return this.productLoaded; }
     applyProductMaterial() {
         const opacity = this.stateValue.productModel?.opacity ?? 0.42;
         const clippingPlanes = this.clippingPlane.normal.lengthSq() ? [this.clippingPlane] : [];

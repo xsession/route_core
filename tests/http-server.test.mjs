@@ -7,6 +7,19 @@ import { tmpdir } from 'node:os';
 import { ProjectService } from '../apps/studio/server/project-service.mjs';
 import { createStudioServer } from '../apps/studio/server/http-server.mjs';
 
+function minimalGlb() {
+  const source = Buffer.from(JSON.stringify({ asset: { version: '2.0' }, scene: 0, scenes: [{}] }), 'utf8');
+  const paddedLength = Math.ceil(source.length / 4) * 4;
+  const output = Buffer.alloc(20 + paddedLength, 0x20);
+  output.write('glTF', 0, 'ascii');
+  output.writeUInt32LE(2, 4);
+  output.writeUInt32LE(output.length, 8);
+  output.writeUInt32LE(paddedLength, 12);
+  output.writeUInt32LE(0x4e4f534a, 16);
+  source.copy(output, 20);
+  return output;
+}
+
 test('loopback HTTP application serves secure offline APIs and assets', async () => {
   const home = mkdtempSync(join(tmpdir(), 'routecore-http-test-'));
   const projectPath = join(home, 'project.routecore');
@@ -154,6 +167,49 @@ test('loopback command-history endpoint restores an older editor state', async (
     assert.equal(restored.workspace.editor.document.metadata.checkoutMarker, 'http-a');
     const latest = await (await fetch(`${base}/api/project/commands?limit=1`)).json();
     assert.equal(latest[0].payload.reason, `checkout command #${entryA.sequence}`);
+  } finally {
+    await new Promise((resolve) => running.server.close(resolve));
+    service.close();
+    rmSync(home, { recursive: true, force: true });
+  }
+});
+
+test('loopback asset endpoints store and serve embedded product models', async () => {
+  const home = mkdtempSync(join(tmpdir(), 'routecore-http-asset-test-'));
+  const projectPath = join(home, 'asset-http.routecore');
+  const service = new ProjectService({ home });
+  service.createProject({ path: projectPath, name: 'Asset HTTP Test', template: 'sample' });
+  const running = await createStudioServer(service, { host: '127.0.0.1', port: 0 });
+  const base = `http://${running.host}:${running.port}`;
+  try {
+    const workspace = await (await fetch(`${base}/api/project/workspace`)).json();
+    const modelId = workspace.editor.modelId;
+    const glb = minimalGlb();
+    const expectedDigest = createHash('sha256').update(glb).digest('hex');
+
+    const upload = await fetch(`${base}/api/project/assets?modelId=${encodeURIComponent(modelId)}&filename=product.glb&role=spatial-product-model`, {
+      method: 'POST',
+      headers: { 'content-type': 'model/gltf-binary' },
+      body: glb,
+    });
+    assert.equal(upload.status, 201);
+    const asset = await upload.json();
+    assert.equal(asset.sha256, expectedDigest);
+    assert.equal(asset.byteLength, glb.length);
+    assert.equal(asset.mediaType, 'model/gltf-binary');
+    assert.equal(asset.originalFilename, 'product.glb');
+    assert.equal(asset.entityId, modelId);
+    assert.equal(asset.role, 'spatial-product-model');
+
+    const download = await fetch(`${base}/api/project/assets/${encodeURIComponent(asset.id)}`);
+    assert.equal(download.status, 200);
+    assert.match(download.headers.get('content-type') || '', /model\/gltf-binary/);
+    assert.equal(download.headers.get('content-length'), String(glb.length));
+    const downloaded = Buffer.from(await download.arrayBuffer());
+    assert.deepEqual(downloaded, glb);
+
+    const missing = await fetch(`${base}/api/project/assets/asset-missing`);
+    assert.notEqual(missing.status, 200);
   } finally {
     await new Promise((resolve) => running.server.close(resolve));
     service.close();

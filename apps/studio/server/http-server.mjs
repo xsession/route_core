@@ -81,6 +81,24 @@ function readBody(request) {
   });
 }
 
+function readRawBody(request) {
+  return new Promise((resolveBody, rejectBody) => {
+    let length = 0;
+    const chunks = [];
+    request.on('data', (chunk) => {
+      length += chunk.length;
+      if (length > maximumBodyBytes) {
+        rejectBody(new Error(`Request body exceeds ${maximumBodyBytes} bytes.`));
+        request.destroy();
+        return;
+      }
+      chunks.push(chunk);
+    });
+    request.on('end', () => resolveBody(Buffer.concat(chunks)));
+    request.on('error', rejectBody);
+  });
+}
+
 function routeId(pathname, prefix, suffix = '') {
   if (!pathname.startsWith(prefix) || (suffix && !pathname.endsWith(suffix))) return null;
   const end = suffix ? pathname.length - suffix.length : pathname.length;
@@ -134,6 +152,31 @@ async function handleApi(service, request, response, url) {
   }
   if (method === 'PUT' && path === '/api/project/document') {
     jsonResponse(response, 200, project().saveEditorDocument(await readBody(request)));
+    return true;
+  }
+  if (method === 'POST' && path === '/api/project/assets') {
+    const mediaType = String(request.headers['content-type'] || 'application/octet-stream').slice(0, 200);
+    jsonResponse(response, 201, project().saveEmbeddedAsset({
+      modelId: url.searchParams.get('modelId') || undefined,
+      data: await readRawBody(request),
+      mediaType,
+      originalFilename: url.searchParams.get('filename') || undefined,
+      entityKind: url.searchParams.get('entityKind') || 'design_model',
+      entityId: url.searchParams.get('entityId') || undefined,
+      role: url.searchParams.get('role') || 'attachment',
+    }));
+    return true;
+  }
+  const assetId = routeId(path, '/api/project/assets/');
+  if (method === 'GET' && assetId) {
+    const asset = project().getEmbeddedAsset(assetId);
+    securityHeaders(response);
+    response.writeHead(200, {
+      'Content-Type': asset.mediaType,
+      'Content-Length': asset.byteLength,
+      'Cache-Control': 'no-store',
+    });
+    response.end(asset.data);
     return true;
   }
   if (method === 'POST' && path === '/api/project/import-editor') {

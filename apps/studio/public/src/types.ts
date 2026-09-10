@@ -216,6 +216,17 @@ export interface SaveDocumentResult {
   commandSequence?: number;
 }
 
+export interface ProjectAsset {
+  id: string;
+  sha256: string;
+  mediaType: string;
+  byteLength: number;
+  originalFilename: string;
+  entityKind: string;
+  entityId: string;
+  role: string;
+}
+
 export interface CommandLogEntry {
   sequence: number;
   id: string;

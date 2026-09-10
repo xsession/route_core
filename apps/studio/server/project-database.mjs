@@ -144,6 +144,58 @@ function normalizePinLabels(component) {
   });
 }
 
+const COMPONENT_ASSEMBLY_FIELD_OWNERSHIP = Object.freeze({
+  definitionId: 'plan',
+  kind: 'plan',
+  designator: 'plan',
+  labels: 'plan',
+  ports: 'plan',
+  position: 'assembly',
+  size: 'assembly',
+  orientation: 'assembly',
+  appearance: 'assembly',
+});
+
+const CONDUCTOR_ASSEMBLY_FIELD_OWNERSHIP = Object.freeze({
+  kind: 'plan',
+  label: 'plan',
+  signal: 'plan',
+  connectivity: 'plan',
+  route: 'assembly',
+  appearance: 'assembly',
+});
+
+function componentPlanOwnedProjection(component) {
+  return {
+    definitionId: component.definitionId,
+    kind: component.kind,
+    designator: component.designator,
+    labels: component.labels,
+    ports: (component.ports || []).map((port) => {
+      const projected = structuredClone(port);
+      delete projected.bankId;
+      return projected;
+    }),
+  };
+}
+
+function conductorPlanOwnedProjection(wire) {
+  return {
+    kind: wire.kind,
+    label: wire.label,
+    signal: wire.signal,
+    source: wire.source,
+    target: wire.target,
+  };
+}
+
+function assemblyOriginContentHash(kind, value) {
+  const projection = kind === 'component'
+    ? componentPlanOwnedProjection(value)
+    : conductorPlanOwnedProjection(value);
+  return sha256(JSON.stringify(projection));
+}
+
 
 function cloneAssemblyDocument(source, selectedComponentIds = [], selectedWireIds = []) {
   const selectedComponents = new Set(selectedComponentIds.length ? selectedComponentIds : source.componentOrder);
@@ -533,20 +585,30 @@ export class ProjectDatabase {
 
   loadEditorDocument(options = {}) {
     const workspace = this.getWorkspaceState();
-    const modelId = options.modelId || workspace.activeModelId;
-    const pageId = options.pageId || workspace.activePageId;
-    const viewKind = options.viewKind || workspace.activeViewKind;
+    const requestedModelId = options.modelId || options.activeModelId || null;
+    const requestedPageId = options.pageId || options.activePageId || null;
+    const requestedViewKind = options.viewKind || options.activeViewKind || null;
+    const modelId = requestedModelId || workspace.activeModelId;
+    const pageId = requestedPageId
+      || (!requestedModelId || requestedModelId === workspace.activeModelId ? workspace.activePageId : null);
+    const viewKind = requestedViewKind || workspace.activeViewKind;
     let row;
     if (pageId) {
-      row = this.database.prepare(`
-        SELECT * FROM app_editor_document WHERE page_id = ? AND view_kind = ?
-      `).get(pageId, viewKind);
+      row = requestedModelId
+        ? this.database.prepare(`
+            SELECT * FROM app_editor_document WHERE page_id = ? AND view_kind = ? AND model_id = ?
+          `).get(pageId, viewKind, requestedModelId)
+        : this.database.prepare(`
+            SELECT * FROM app_editor_document WHERE page_id = ? AND view_kind = ?
+          `).get(pageId, viewKind);
     }
+    if (!row && requestedPageId) throw new Error('The requested editor page does not exist in the selected model and view.');
     if (!row && modelId) {
       row = this.database.prepare(`
         SELECT * FROM app_editor_document WHERE model_id = ? AND view_kind = ? ORDER BY updated_at DESC LIMIT 1
       `).get(modelId, viewKind);
     }
+    if (!row && requestedModelId) throw new Error('The requested editor model does not contain this view.');
     if (!row) row = this.database.prepare('SELECT * FROM app_editor_document ORDER BY updated_at DESC LIMIT 1').get();
     if (!row) throw new Error('No editor document exists in the project.');
     return {
@@ -661,6 +723,18 @@ export class ProjectDatabase {
   }
 
   saveEditorDocument(input) {
+    this.database.exec('BEGIN IMMEDIATE');
+    try {
+      const result = this.saveEditorDocumentInTransaction(input);
+      this.database.exec('COMMIT');
+      return result;
+    } catch (error) {
+      this.database.exec('ROLLBACK');
+      throw error;
+    }
+  }
+
+  saveEditorDocumentInTransaction(input) {
     const parsed = parseDocument(JSON.stringify(input.document));
     const modelId = input.modelId || this.getWorkspaceState().activeModelId;
     const pageId = input.pageId || this.getWorkspaceState().activePageId;
@@ -687,9 +761,7 @@ export class ProjectDatabase {
     }
 
     const now = nowIso();
-    this.database.exec('BEGIN IMMEDIATE');
-    try {
-      this.database.prepare(`
+    this.database.prepare(`
         INSERT INTO app_editor_document(
           id, model_id, page_id, view_kind, schema_version,
           document_revision, content_hash, document_json, updated_at
@@ -763,13 +835,8 @@ export class ProjectDatabase {
       );
 
       this.rebuildNormalizedModel(modelId);
-      this.createRecoverySnapshot(modelId, pageId, viewKind, parsed, Number(commandResult.lastInsertRowid));
-      this.database.exec('COMMIT');
-      return { changed: true, contentHash, revision: parsed.revision, savedAt: now, commandSequence: Number(commandResult.lastInsertRowid) };
-    } catch (error) {
-      this.database.exec('ROLLBACK');
-      throw error;
-    }
+    this.createRecoverySnapshot(modelId, pageId, viewKind, parsed, Number(commandResult.lastInsertRowid));
+    return { changed: true, contentHash, revision: parsed.revision, savedAt: now, commandSequence: Number(commandResult.lastInsertRowid) };
   }
 
   rebuildNormalizedModel(modelId) {
@@ -1391,16 +1458,16 @@ export class ProjectDatabase {
         mappingStatement.run(
           createId('origin-map'), assemblyId, 'component', assemblyEntityId,
           sourceEditor.modelId, 'component', originId, originRevision,
-          APP_VERSION, sha256(JSON.stringify(sourceEditor.document.components[originId])),
-          JSON.stringify({ position: 'assembly', labels: 'plan', ports: 'plan' }),
+          APP_VERSION, assemblyOriginContentHash('component', sourceEditor.document.components[originId]),
+          JSON.stringify(COMPONENT_ASSEMBLY_FIELD_OWNERSHIP),
         );
       }
       for (const [originId, assemblyEntityId] of generated.wireMap) {
         mappingStatement.run(
           createId('origin-map'), assemblyId, 'conductor', assemblyEntityId,
           sourceEditor.modelId, 'conductor', originId, originRevision,
-          APP_VERSION, sha256(JSON.stringify(sourceEditor.document.wires[originId])),
-          JSON.stringify({ route: 'assembly', appearance: 'assembly', connectivity: 'plan' }),
+          APP_VERSION, assemblyOriginContentHash('conductor', sourceEditor.document.wires[originId]),
+          JSON.stringify(CONDUCTOR_ASSEMBLY_FIELD_OWNERSHIP),
         );
       }
       this.createRecoverySnapshot(assemblyId, layoutPageId, 'layout', generated.document, null);
@@ -1572,7 +1639,7 @@ export class ProjectDatabase {
         details.push({ state: 'conflicted', entityKind: entity.kind, originEntityId: entity.id, assemblyEntityId: mapping.assembly_entity_id, explanation: 'The linked assembly entity was deleted or cannot be resolved.' });
         continue;
       }
-      const currentHash = sha256(JSON.stringify(entity.value));
+      const currentHash = assemblyOriginContentHash(entity.kind, entity.value);
       if (currentHash !== mapping.last_synced_content_hash) {
         details.push({ state: 'changed', entityKind: entity.kind, originEntityId: entity.id, assemblyEntityId: mapping.assembly_entity_id, explanation: 'Plan-owned electrical identity or connectivity changed since the last synchronization.' });
       }
@@ -1583,10 +1650,25 @@ export class ProjectDatabase {
     }
     const counts = { added: 0, changed: 0, detached: 0, conflicted: 0 };
     for (const detail of details) counts[detail.state] += 1;
-    const toRevisionId = this.database.prepare('SELECT id FROM revision WHERE model_id = ? ORDER BY created_at DESC LIMIT 1').get(originModelId)?.id || origin.contentHash;
+    const latestOriginRevision = this.database.prepare('SELECT id, model_content_hash FROM revision WHERE model_id = ? ORDER BY created_at DESC LIMIT 1').get(originModelId);
+    const toRevisionId = latestOriginRevision?.model_content_hash === origin.contentHash ? latestOriginRevision.id : origin.contentHash;
     const fromRevisionId = mappings.find((row) => row.origin_revision_id)?.origin_revision_id || null;
     const summary = { assemblyModelId: selectedAssemblyId, originModelId, originPageId: origin.pageId, counts, details };
-    const previewHash = sha256(JSON.stringify(summary));
+    const previewHash = sha256(JSON.stringify({
+      summary,
+      originContentHash: origin.contentHash,
+      assemblyContentHash: assembly.contentHash,
+      fromRevisionId,
+      toRevisionId,
+      mappings: mappings.map((row) => ({
+        id: row.id,
+        originEntityKind: row.origin_entity_kind,
+        originEntityId: row.origin_entity_id,
+        assemblyEntityId: row.assembly_entity_id,
+        lastSyncedContentHash: row.last_synced_content_hash,
+        fieldOwnership: JSON.parse(row.field_ownership_json),
+      })),
+    }));
     const existing = this.database.prepare(`SELECT id FROM assembly_sync_record WHERE assembly_model_id = ? AND preview_hash = ? AND state = 'preview' ORDER BY created_at DESC LIMIT 1`).get(selectedAssemblyId, previewHash);
     const syncRecordId = existing?.id || createId('assembly-sync');
     if (!existing) this.database.prepare(`
@@ -1616,13 +1698,9 @@ export class ProjectDatabase {
       const component = document.components[row.assembly_entity_id];
       for (const port of component?.ports || []) portMap.set(port.metadata?.originPortId, port.id);
     }
-    const mappingInsert = this.database.prepare(`
-      INSERT INTO assembly_origin_mapping(
-        id, assembly_model_id, assembly_entity_kind, assembly_entity_id,
-        origin_model_id, origin_entity_kind, origin_entity_id, origin_revision_id,
-        generation_rule_version, last_synced_content_hash, field_ownership_json
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `);
+    const mappingInserts = [];
+    const mappingUpdates = [];
+    const mappingDeletes = [];
     for (const originId of origin.document.componentOrder) {
       const source = origin.document.components[originId];
       let mapping = componentMapping.get(originId);
@@ -1637,20 +1715,28 @@ export class ProjectDatabase {
           id: createId('origin-map'), assembly_entity_id: target.id, origin_entity_id: originId,
         };
         componentMapping.set(originId, mapping);
-        mappingInsert.run(mapping.id, record.assembly_model_id, 'component', target.id, summary.originModelId, 'component', originId, record.to_origin_revision_id, APP_VERSION, sha256(JSON.stringify(source)), JSON.stringify({ position: 'assembly', labels: 'plan', ports: 'plan' }));
+        mappingInserts.push({
+          id: mapping.id,
+          assemblyEntityKind: 'component',
+          assemblyEntityId: target.id,
+          originEntityKind: 'component',
+          originEntityId: originId,
+          contentHash: assemblyOriginContentHash('component', source),
+          fieldOwnership: COMPONENT_ASSEMBLY_FIELD_OWNERSHIP,
+        });
       }
+      if (source.definitionId === undefined) delete target.definitionId;
+      else target.definitionId = source.definitionId;
+      target.kind = source.kind;
+      target.designator = source.designator;
       target.labels = structuredClone(source.labels);
       const existingByOrigin = new Map(target.ports.map((port) => [port.metadata?.originPortId, port]));
       const usedBanks = new Map();
       target.ports = source.ports.map((port, index) => {
         const existing = existingByOrigin.get(port.id);
-        const next = existing || { ...structuredClone(port), id: createId('port') };
-        next.label = port.label;
-        next.function = port.function;
-        next.detail = port.detail;
-        next.electricalClass = port.electricalClass;
-        next.connectionPolicy = structuredClone(port.connectionPolicy);
-        next.metadata = { ...(next.metadata || {}), originPortId: port.id };
+        const next = { ...structuredClone(port), id: existing?.id || createId('port') };
+        delete next.bankId;
+        next.metadata = { ...(structuredClone(port.metadata) || {}), originPortId: port.id };
         const side = port.side;
         let bank = usedBanks.get(side);
         if (!bank) {
@@ -1667,7 +1753,7 @@ export class ProjectDatabase {
       });
       target.pinBanks = [...usedBanks.values()];
       target.metadata = { ...(target.metadata || {}), originComponentId: originId, detachedFromOrigin: false };
-      this.database.prepare(`UPDATE assembly_origin_mapping SET origin_revision_id = ?, last_synced_content_hash = ? WHERE id = ?`).run(record.to_origin_revision_id, sha256(JSON.stringify(source)), mapping.id);
+      mappingUpdates.push({ id: mapping.id, entityKind: 'component', contentHash: assemblyOriginContentHash('component', source) });
     }
     const mapEndpoint = (endpoint) => {
       if (endpoint.kind !== 'port') return structuredClone(endpoint);
@@ -1688,7 +1774,15 @@ export class ProjectDatabase {
         document.wireOrder.push(target.id);
         mapping = { id: createId('origin-map'), assembly_entity_id: target.id, origin_entity_id: originId };
         wireMapping.set(originId, mapping);
-        mappingInsert.run(mapping.id, record.assembly_model_id, 'conductor', target.id, summary.originModelId, 'conductor', originId, record.to_origin_revision_id, APP_VERSION, sha256(JSON.stringify(source)), JSON.stringify({ route: 'assembly', appearance: 'assembly', connectivity: 'plan' }));
+        mappingInserts.push({
+          id: mapping.id,
+          assemblyEntityKind: 'conductor',
+          assemblyEntityId: target.id,
+          originEntityKind: 'conductor',
+          originEntityId: originId,
+          contentHash: assemblyOriginContentHash('conductor', source),
+          fieldOwnership: CONDUCTOR_ASSEMBLY_FIELD_OWNERSHIP,
+        });
       }
       target.label = source.label;
       target.signal = source.signal;
@@ -1696,15 +1790,25 @@ export class ProjectDatabase {
       target.source = mapEndpoint(source.source);
       target.target = mapEndpoint(source.target);
       target.metadata = { ...(target.metadata || {}), originWireId: originId, detachedFromOrigin: false };
-      this.database.prepare(`UPDATE assembly_origin_mapping SET origin_revision_id = ?, last_synced_content_hash = ? WHERE id = ?`).run(record.to_origin_revision_id, sha256(JSON.stringify(source)), mapping.id);
+      mappingUpdates.push({ id: mapping.id, entityKind: 'conductor', contentHash: assemblyOriginContentHash('conductor', source) });
     }
     for (const detail of summary.details.filter((value) => value.state === 'detached')) {
       const entity = detail.entityKind === 'component' ? document.components[detail.assemblyEntityId] : document.wires[detail.assemblyEntityId];
       if (entity) entity.metadata = { ...(entity.metadata || {}), detachedFromOrigin: true };
-      this.database.prepare('DELETE FROM assembly_origin_mapping WHERE assembly_model_id = ? AND origin_entity_kind = ? AND origin_entity_id = ?').run(record.assembly_model_id, detail.entityKind, detail.originEntityId);
+      mappingDeletes.push({ entityKind: detail.entityKind, originEntityId: detail.originEntityId });
+      if (detail.entityKind === 'component') componentMapping.delete(detail.originEntityId);
+      else wireMapping.delete(detail.originEntityId);
     }
     const usedDesignators = new Set();
-    for (const componentId of document.componentOrder) {
+    const planOwnedComponentIds = origin.document.componentOrder
+      .map((originId) => componentMapping.get(originId)?.assembly_entity_id)
+      .filter((id) => Boolean(id) && Boolean(document.components[id]));
+    const planOwnedComponentSet = new Set(planOwnedComponentIds);
+    const designatorPriority = [
+      ...planOwnedComponentIds,
+      ...document.componentOrder.filter((id) => !planOwnedComponentSet.has(id)),
+    ];
+    for (const componentId of designatorPriority) {
       const component = document.components[componentId];
       if (!component) continue;
       const original = component.designator || component.id;
@@ -1719,7 +1823,6 @@ export class ProjectDatabase {
       if (component.labels.title === original) component.labels.title = component.designator;
       usedDesignators.add(component.designator);
     }
-    this.saveEditorDocument({ modelId: record.assembly_model_id, pageId: layout.pageId, viewKind: 'layout', document, reason: `apply assembly sync ${record.id}` });
     const schematicEnvelope = this.loadEditorDocument({ modelId: record.assembly_model_id, viewKind: 'schematic' });
     const schematic = structuredClone(schematicEnvelope.document);
     for (const id of document.componentOrder) {
@@ -1737,12 +1840,78 @@ export class ProjectDatabase {
       const source = document.wires[id];
       schematic.wires[id] = { ...structuredClone(source), routing: { ...structuredClone(source.routing), pattern: 'orthogonal', constraints: [] } };
       delete schematic.wires[id].route;
-      if (!schematic.wireOrder.includes(id)) schematic.wireOrder.push(id);
+        if (!schematic.wireOrder.includes(id)) schematic.wireOrder.push(id);
     }
-    this.saveEditorDocument({ modelId: record.assembly_model_id, pageId: schematicEnvelope.pageId, viewKind: 'schematic', document: schematic, reason: `apply assembly sync ${record.id}` });
+    const validatedLayout = parseDocument(JSON.stringify(document));
+    const validatedSchematic = parseDocument(JSON.stringify(schematic));
     const now = nowIso();
-    this.database.prepare(`UPDATE assembly_sync_record SET state = 'applied', applied_revision_id = ?, applied_at = ? WHERE id = ?`).run(record.to_origin_revision_id, now, record.id);
-    this.setWorkspaceState({ activeModelId: record.assembly_model_id, activePageId: layout.pageId, activeViewKind: 'layout' });
+    const syncBatchId = createId('batch');
+    this.database.exec('BEGIN IMMEDIATE');
+    try {
+      this.saveEditorDocumentInTransaction({
+        modelId: record.assembly_model_id,
+        pageId: layout.pageId,
+        viewKind: 'layout',
+        document: validatedLayout,
+        reason: `apply assembly sync ${record.id}`,
+        batchId: syncBatchId,
+      });
+      this.saveEditorDocumentInTransaction({
+        modelId: record.assembly_model_id,
+        pageId: schematicEnvelope.pageId,
+        viewKind: 'schematic',
+        document: validatedSchematic,
+        reason: `apply assembly sync ${record.id}`,
+        batchId: syncBatchId,
+      });
+
+      const mappingInsert = this.database.prepare(`
+        INSERT INTO assembly_origin_mapping(
+          id, assembly_model_id, assembly_entity_kind, assembly_entity_id,
+          origin_model_id, origin_entity_kind, origin_entity_id, origin_revision_id,
+          generation_rule_version, last_synced_content_hash, field_ownership_json
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `);
+      for (const mapping of mappingInserts) {
+        mappingInsert.run(
+          mapping.id,
+          record.assembly_model_id,
+          mapping.assemblyEntityKind,
+          mapping.assemblyEntityId,
+          summary.originModelId,
+          mapping.originEntityKind,
+          mapping.originEntityId,
+          record.to_origin_revision_id,
+          APP_VERSION,
+          mapping.contentHash,
+          JSON.stringify(mapping.fieldOwnership),
+        );
+      }
+      const mappingUpdate = this.database.prepare(`
+        UPDATE assembly_origin_mapping
+        SET origin_revision_id = ?, generation_rule_version = ?, last_synced_content_hash = ?, field_ownership_json = ?
+        WHERE id = ?
+      `);
+      for (const mapping of mappingUpdates) {
+        const ownership = mapping.entityKind === 'component'
+          ? COMPONENT_ASSEMBLY_FIELD_OWNERSHIP
+          : CONDUCTOR_ASSEMBLY_FIELD_OWNERSHIP;
+        mappingUpdate.run(record.to_origin_revision_id, APP_VERSION, mapping.contentHash, JSON.stringify(ownership), mapping.id);
+      }
+      const mappingDelete = this.database.prepare(`
+        DELETE FROM assembly_origin_mapping
+        WHERE assembly_model_id = ? AND origin_entity_kind = ? AND origin_entity_id = ?
+      `);
+      for (const mapping of mappingDeletes) {
+        mappingDelete.run(record.assembly_model_id, mapping.entityKind, mapping.originEntityId);
+      }
+      this.database.prepare(`UPDATE assembly_sync_record SET state = 'applied', applied_revision_id = ?, applied_at = ? WHERE id = ?`).run(record.to_origin_revision_id, now, record.id);
+      this.setWorkspaceState({ activeModelId: record.assembly_model_id, activePageId: layout.pageId, activeViewKind: 'layout' });
+      this.database.exec('COMMIT');
+    } catch (error) {
+      this.database.exec('ROLLBACK');
+      throw error;
+    }
     return { recordId: record.id, state: 'applied', counts: summary.counts, workspace: this.getWorkspace() };
   }
 
@@ -1812,6 +1981,72 @@ export class ProjectDatabase {
 
   deleteBomItem(id) {
     return this.database.prepare('DELETE FROM app_bom_item WHERE id = ?').run(id).changes > 0;
+  }
+
+  saveEmbeddedAsset(input = {}) {
+    const modelId = input.modelId || this.getWorkspaceState().activeModelId;
+    const data = Buffer.isBuffer(input.data) ? input.data : Buffer.from(input.data || []);
+    if (!modelId || !this.database.prepare('SELECT id FROM design_model WHERE id = ?').get(modelId)) {
+      throw new Error('A valid model is required for a project asset.');
+    }
+    if (!data.length) throw new Error('The project asset is empty.');
+    const mediaType = String(input.mediaType || 'application/octet-stream').slice(0, 200);
+    const filename = String(input.originalFilename || 'asset').replaceAll('\\', '/').split('/').pop().slice(0, 255) || 'asset';
+    const digest = sha256(data);
+    const entityKind = String(input.entityKind || 'design_model');
+    const entityId = String(input.entityId || modelId);
+    const role = String(input.role || 'attachment');
+    const now = nowIso();
+
+    this.database.exec('BEGIN IMMEDIATE');
+    try {
+      let asset = this.database.prepare('SELECT * FROM asset_blob WHERE sha256 = ?').get(digest);
+      if (!asset) {
+        const id = createId('asset');
+        this.database.prepare(`
+          INSERT INTO asset_blob(
+            id, sha256, media_type, byte_length, original_filename,
+            storage_mode, blob_data, external_path, required, created_at
+          ) VALUES (?, ?, ?, ?, ?, 'embedded', ?, NULL, 1, ?)
+        `).run(id, digest, mediaType, data.length, filename, data, now);
+        asset = this.database.prepare('SELECT * FROM asset_blob WHERE id = ?').get(id);
+      }
+      this.database.prepare(`DELETE FROM entity_asset WHERE entity_kind = ? AND entity_id = ? AND role = ?`).run(entityKind, entityId, role);
+      this.database.prepare(`
+        INSERT INTO entity_asset(asset_id, entity_kind, entity_id, role, display_order)
+        VALUES (?, ?, ?, ?, 0)
+      `).run(asset.id, entityKind, entityId, role);
+      this.database.exec('COMMIT');
+      return {
+        id: asset.id,
+        sha256: asset.sha256,
+        mediaType: asset.media_type,
+        byteLength: asset.byte_length,
+        originalFilename: asset.original_filename,
+        entityKind,
+        entityId,
+        role,
+      };
+    } catch (error) {
+      this.database.exec('ROLLBACK');
+      throw error;
+    }
+  }
+
+  getEmbeddedAsset(id) {
+    const row = this.database.prepare(`
+      SELECT id, sha256, media_type, byte_length, original_filename, blob_data
+      FROM asset_blob WHERE id = ? AND storage_mode = 'embedded'
+    `).get(id);
+    if (!row) throw new Error('Project asset not found.');
+    return {
+      id: row.id,
+      sha256: row.sha256,
+      mediaType: row.media_type,
+      byteLength: row.byte_length,
+      originalFilename: row.original_filename,
+      data: row.blob_data,
+    };
   }
 
   integrityCheck() {

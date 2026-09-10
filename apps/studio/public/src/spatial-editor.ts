@@ -8,6 +8,7 @@ import {
   type SpatialCableAnalysis,
   type SpatialHarnessDocument,
   type SpatialPoint,
+  type SpatialProductModel,
   type SpatialViewpoint,
 } from '../vendor/editor-core/index.js';
 
@@ -21,15 +22,6 @@ interface SpatialEditorCallbacks {
   onSelectionChanged(selection: SpatialSelection): void;
 }
 
-function dataUrlFromFile(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result));
-    reader.onerror = () => reject(reader.error || new Error('Could not read the product model.'));
-    reader.readAsDataURL(file);
-  });
-}
-
 export class SpatialHarnessEditor {
   private readonly host: HTMLElement;
   private readonly callbacks: SpatialEditorCallbacks;
@@ -40,6 +32,7 @@ export class SpatialHarnessEditor {
   private readonly transform: TransformControls;
   private readonly cableGroup = new THREE.Group();
   private readonly productGroup = new THREE.Group();
+  private readonly cableMeshes = new Map<string, THREE.Mesh>();
   private readonly handles = new Map<string, THREE.Mesh>();
   private readonly raycaster = new THREE.Raycaster();
   private readonly pointer = new THREE.Vector2();
@@ -47,6 +40,7 @@ export class SpatialHarnessEditor {
   private stateValue: SpatialHarnessDocument = { version: 1, unit: 'mm', cables: {}, cableOrder: [], viewpoints: [] };
   private selectionValue: SpatialSelection = { cableId: null, pointIndex: null };
   private clippingPlane = new THREE.Plane(new THREE.Vector3(0, 0, 0), 0);
+  private productLoadGeneration = 0;
 
   public constructor(host: HTMLElement, callbacks: SpatialEditorCallbacks) {
     this.host = host;
@@ -158,13 +152,17 @@ export class SpatialHarnessEditor {
     this.emit('delete spatial cable control point');
   }
 
-  public async importProduct(file: File): Promise<void> {
-    if (!file.name.toLowerCase().endsWith('.glb')) throw new Error('Use a self-contained binary glTF (.glb) product model.');
-    if (file.size > 16 * 1024 * 1024) throw new Error('The embedded GLB must be 16 MB or smaller. Decimate the review model before importing it.');
-    const dataUrl = await dataUrlFromFile(file);
-    this.stateValue.productModel = { name: file.name, mediaType: 'model/gltf-binary', dataUrl, opacity: 0.42 };
+  public setProductModel(model: SpatialProductModel): void {
+    this.stateValue.productModel = structuredClone(model);
     this.rebuildProduct();
     this.emit('import 3D product model');
+  }
+
+  public setProductUnitScale(scaleMm: number): void {
+    if (!this.stateValue.productModel || !Number.isFinite(scaleMm) || scaleMm <= 0) return;
+    this.stateValue.productModel.sourceUnitScaleMm = scaleMm;
+    this.rebuildProduct();
+    this.emit('change 3D product unit scale');
   }
 
   public setProductOpacity(opacity: number): void {
@@ -221,6 +219,8 @@ export class SpatialHarnessEditor {
   public screenshot(): string { return this.renderer.domElement.toDataURL('image/png'); }
 
   private rebuildProduct(): void {
+    const loadGeneration = ++this.productLoadGeneration;
+    this.disposeObjectTree(this.productGroup);
     this.productGroup.clear();
     const model = this.stateValue.productModel;
     if (!model) {
@@ -235,8 +235,19 @@ export class SpatialHarnessEditor {
       this.render();
       return;
     }
-    fetch(model.dataUrl).then((response) => response.arrayBuffer()).then((buffer) => {
+    fetch(`/api/project/assets/${encodeURIComponent(model.assetId)}`).then((response) => {
+      if (!response.ok) throw new Error(`Could not load project asset (${response.status}).`);
+      return response.arrayBuffer();
+    }).then((buffer) => {
       new GLTFLoader().parse(buffer, '', (gltf) => {
+        if (loadGeneration !== this.productLoadGeneration) {
+          this.disposeObjectTree(gltf.scene);
+          return;
+        }
+        const sourceScale = Number.isFinite(model.sourceUnitScaleMm) && model.sourceUnitScaleMm > 0 ? model.sourceUnitScaleMm : 1000;
+        const sourceUnit = new THREE.Matrix4().makeScale(sourceScale, sourceScale, sourceScale);
+        const placement = new THREE.Matrix4().fromArray(model.modelToHarnessTransform);
+        gltf.scene.applyMatrix4(new THREE.Matrix4().multiplyMatrices(placement, sourceUnit));
         this.productGroup.add(gltf.scene);
         this.applyProductMaterial();
         this.fit();
@@ -261,18 +272,18 @@ export class SpatialHarnessEditor {
   }
 
   private rebuildCables(): void {
+    this.transform.detach();
+    for (const object of this.cableGroup.children) this.disposeMesh(object);
     this.cableGroup.clear();
+    this.cableMeshes.clear();
     this.handles.clear();
     for (const id of this.stateValue.cableOrder) {
       const cable = this.stateValue.cables[id];
       if (!cable || cable.controlPoints.length < 2) continue;
       const points = cable.controlPoints.map((point) => new THREE.Vector3(point.x, point.y, point.z));
-      const curve = new THREE.CatmullRomCurve3(points, false, 'centripetal', 0.35);
       const analysis = analyzeSpatialCable(cable);
-      const geometry = new THREE.TubeGeometry(curve, Math.max(16, points.length * 12), cable.diameterMm / 2, 10, false);
-      const material = new THREE.MeshStandardMaterial({ color: analysis.valid && this.collisionCount(id) === 0 ? cable.color : 0xef4444, roughness: 0.48, metalness: 0.05 });
-      const mesh = new THREE.Mesh(geometry, material);
-      mesh.userData = { cableId: id };
+      const mesh = this.createCableMesh(id);
+      this.cableMeshes.set(id, mesh);
       this.cableGroup.add(mesh);
       if (id === this.selectionValue.cableId) points.forEach((point, index) => {
         const handle = new THREE.Mesh(new THREE.SphereGeometry(Math.max(3, cable.diameterMm * 0.9), 16, 10), new THREE.MeshStandardMaterial({ color: analysis.bendViolations.some((issue) => issue.pointIndex === index) ? 0xef4444 : index === this.selectionValue.pointIndex ? 0xfacc15 : 0x38bdf8 }));
@@ -284,6 +295,61 @@ export class SpatialHarnessEditor {
     }
     this.attachSelectedHandle();
     this.render();
+  }
+
+  private createCableMesh(id: string): THREE.Mesh {
+    const cable = this.stateValue.cables[id]!;
+    const points = cable.controlPoints.map((point) => new THREE.Vector3(point.x, point.y, point.z));
+    const curve = new THREE.CatmullRomCurve3(points, false, 'centripetal', 0.35);
+    const analysis = analyzeSpatialCable(cable);
+    const geometry = new THREE.TubeGeometry(curve, Math.max(16, points.length * 12), cable.diameterMm / 2, 10, false);
+    const material = new THREE.MeshStandardMaterial({ color: analysis.valid && this.collisionCount(id) === 0 ? cable.color : 0xef4444, roughness: 0.48, metalness: 0.05 });
+    const mesh = new THREE.Mesh(geometry, material);
+    mesh.userData = { cableId: id, kind: 'cable' };
+    return mesh;
+  }
+
+  private refreshCableVisual(id: string): void {
+    const previous = this.cableMeshes.get(id);
+    if (previous) {
+      this.cableGroup.remove(previous);
+      this.disposeMesh(previous);
+    }
+    const cable = this.stateValue.cables[id];
+    if (!cable || cable.controlPoints.length < 2) return;
+    const mesh = this.createCableMesh(id);
+    this.cableMeshes.set(id, mesh);
+    this.cableGroup.add(mesh);
+
+    const analysis = analyzeSpatialCable(cable);
+    for (let index = 0; index < cable.controlPoints.length; index += 1) {
+      const handle = this.handles.get(`${id}:${index}`);
+      const material = handle?.material;
+      if (!(material instanceof THREE.MeshStandardMaterial)) continue;
+      material.color.set(analysis.bendViolations.some((issue) => issue.pointIndex === index)
+        ? 0xef4444
+        : index === this.selectionValue.pointIndex ? 0xfacc15 : 0x38bdf8);
+    }
+    this.render();
+  }
+
+  private disposeMesh(object: THREE.Object3D): void {
+    if (!(object instanceof THREE.Mesh)) return;
+    object.geometry.dispose();
+    const materials = Array.isArray(object.material) ? object.material : [object.material];
+    for (const material of materials) material.dispose();
+  }
+
+  private disposeObjectTree(root: THREE.Object3D): void {
+    root.traverse((object) => {
+      if (!(object instanceof THREE.Mesh)) return;
+      object.geometry.dispose();
+      const materials = Array.isArray(object.material) ? object.material : [object.material];
+      for (const material of materials) {
+        for (const value of Object.values(material)) if (value instanceof THREE.Texture) value.dispose();
+        material.dispose();
+      }
+    });
   }
 
   private selectAt(event: PointerEvent): void {
@@ -320,8 +386,12 @@ export class SpatialHarnessEditor {
     point.x = handle.position.x;
     point.y = handle.position.y;
     point.z = handle.position.z;
-    this.rebuildCables();
-    if (commit) this.emit('move spatial cable control point');
+    if (commit) {
+      this.rebuildCables();
+      this.emit('move spatial cable control point');
+    } else {
+      this.refreshCableVisual(cableId);
+    }
   }
 
   private nearestProductSurface(point: THREE.Vector3): THREE.Vector3 | null {

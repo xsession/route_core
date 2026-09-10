@@ -100,11 +100,19 @@ test('project database supports editor persistence, revisions, BOM, assemblies, 
     assert.equal(dimension.kind, 'dimension');
     assert.equal(project.listDrawingElements(assembly.workspace.activeModelId, assembly.workspace.activePageId).length, 4);
 
+    const requestedOrigin = project.loadEditorDocument({ modelId: workspace.editor.modelId, viewKind: 'layout' });
+    assert.equal(requestedOrigin.modelId, workspace.editor.modelId, 'an explicit model selection must not reuse the active assembly page');
+    const generatedLayout = project.loadEditorDocument({ modelId: assembly.workspace.activeModelId, viewKind: 'layout' });
+    const expectedAdded = requestedOrigin.document.componentOrder.length + requestedOrigin.document.wireOrder.length
+      - generatedLayout.document.componentOrder.length - generatedLayout.document.wireOrder.length;
+    assert.ok(expectedAdded > 0);
     const syncPreview = project.previewAssemblySync(assembly.workspace.activeModelId);
-    assert.ok(syncPreview.counts.added >= 1);
+    assert.equal(syncPreview.originModelId, workspace.editor.modelId);
+    assert.deepEqual(syncPreview.counts, { added: expectedAdded, changed: 0, detached: 0, conflicted: 0 });
     const syncResult = project.applyAssemblySync(syncPreview.id);
     assert.equal(syncResult.state, 'applied');
     assert.equal(syncResult.workspace.workspace.activeViewKind, 'layout');
+    assert.deepEqual(project.previewAssemblySync(assembly.workspace.activeModelId).counts, { added: 0, changed: 0, detached: 0, conflicted: 0 });
 
     for (const definition of availableExports()) {
       const output = generateExport(project, definition.id, {

@@ -22,6 +22,17 @@ import type { EditorCallbacks, EditorTool } from './types.js';
 
 const EMPTY_OVERLAY: SvgInteractionOverlay = {};
 
+function cursorForTool(tool: EditorTool): string {
+  const cursors: Record<EditorTool, string> = {
+    select: 'default',
+    pan: 'grab',
+    wire: 'crosshair',
+    label: 'text',
+    component: 'copy',
+  };
+  return cursors[tool];
+}
+
 function completeViewport(value: Partial<ViewportState> | undefined, width: number, height: number): ViewportState {
   const zoom = Number(value?.zoom);
   const panX = Number(value?.pan?.x);
@@ -53,6 +64,7 @@ export class CanvasHost {
   private dark = true;
   private pointerCapture: number | null = null;
   private spaceDown = false;
+  private inputEnabled = true;
   private showRouteHandles = true;
   private showDiagnostics = true;
   private lastScreenPoint: Point = { x: 0, y: 0 };
@@ -102,6 +114,20 @@ export class CanvasHost {
     return this.toolValue;
   }
 
+  public setInputEnabled(enabled: boolean): void {
+    if (this.inputEnabled === enabled) return;
+    this.inputEnabled = enabled;
+    if (!enabled) {
+      if (this.pointerCapture !== null) {
+        this.interaction.pointerCancel(this.pointerCapture);
+        if (this.shell.hasPointerCapture(this.pointerCapture)) this.shell.releasePointerCapture(this.pointerCapture);
+        this.pointerCapture = null;
+      }
+      this.spaceDown = false;
+    }
+    this.shell.style.cursor = enabled ? cursorForTool(this.toolValue) : 'default';
+  }
+
   public load(document: EditorDocument, viewport?: Partial<ViewportState>): void {
     if (this.engineValue.isPreviewActive) this.engineValue.cancelPreview();
     const bounds = this.shell.getBoundingClientRect();
@@ -124,14 +150,7 @@ export class CanvasHost {
   public setTool(tool: EditorTool): void {
     if (this.engineValue.isPreviewActive) this.engineValue.cancelPreview();
     this.toolValue = tool;
-    const cursors: Record<EditorTool, string> = {
-      select: 'default',
-      pan: 'grab',
-      wire: 'crosshair',
-      label: 'text',
-      component: 'copy',
-    };
-    this.shell.style.cursor = cursors[tool];
+    this.shell.style.cursor = this.inputEnabled ? cursorForTool(tool) : 'default';
     const message: Record<EditorTool, string> = {
       select: 'Select and manipulate entities.',
       pan: 'Drag to pan the drawing.',
@@ -366,6 +385,7 @@ export class CanvasHost {
 
   private bindDomEvents(): void {
     this.shell.addEventListener('pointerdown', (event) => {
+      if (!this.inputEnabled) return;
       this.shell.focus();
       this.lastScreenPoint = this.eventScreenPoint(event);
       const pointerEvent = this.pointerEvent(event);
@@ -385,6 +405,7 @@ export class CanvasHost {
       this.interaction.pointerDown(pointerEvent);
     });
     this.shell.addEventListener('pointermove', (event) => {
+      if (!this.inputEnabled) return;
       this.lastScreenPoint = this.eventScreenPoint(event);
       const pointer = this.pointerEvent(event);
       this.coordinates.textContent = `X ${pointer.point.x.toFixed(1)}   Y ${pointer.point.y.toFixed(1)}`;
@@ -393,6 +414,7 @@ export class CanvasHost {
       this.interaction.pointerMove(pointer);
     });
     this.shell.addEventListener('pointerup', (event) => {
+      if (!this.inputEnabled) return;
       const pointer = this.pointerEvent(event);
       if (this.toolValue === 'pan') pointer.modifiers.space = true;
       this.interaction.pointerUp(pointer);
@@ -401,11 +423,15 @@ export class CanvasHost {
       this.suppressNextClick = false;
     });
     this.shell.addEventListener('pointercancel', (event) => {
+      if (!this.inputEnabled) return;
       this.interaction.pointerCancel(event.pointerId);
       this.pointerCapture = null;
     });
-    this.shell.addEventListener('contextmenu', (event) => event.preventDefault());
+    this.shell.addEventListener('contextmenu', (event) => {
+      if (this.inputEnabled) event.preventDefault();
+    });
     this.shell.addEventListener('wheel', (event) => {
+      if (!this.inputEnabled) return;
       event.preventDefault();
       const bounds = this.shell.getBoundingClientRect();
       this.viewportValue.zoomAt({ x: event.clientX - bounds.left, y: event.clientY - bounds.top }, Math.exp(-event.deltaY * 0.0014));
@@ -413,6 +439,7 @@ export class CanvasHost {
       this.emitViewport();
     }, { passive: false });
     this.shell.addEventListener('dblclick', (event) => {
+      if (!this.inputEnabled) return;
       if (this.suppressNextClick) return;
       const target = event.target as Element | null;
       const component = target?.closest<SVGGElement>('[data-component-id]')?.dataset.componentId;
@@ -424,6 +451,7 @@ export class CanvasHost {
       this.callbacks.onStatus('Use the Properties panel to edit the selected entity.');
     });
     window.addEventListener('keydown', (event) => {
+      if (!this.inputEnabled) return;
       if (event.code === 'Space' && !isTextEntryTarget(event.target)) {
         this.spaceDown = true;
         if (!event.repeat) this.shell.style.cursor = 'grab';
@@ -439,9 +467,10 @@ export class CanvasHost {
       if (handled) event.preventDefault();
     });
     window.addEventListener('keyup', (event) => {
+      if (!this.inputEnabled) return;
       if (event.code === 'Space') {
         this.spaceDown = false;
-        this.shell.style.cursor = this.toolValue === 'pan' ? 'grab' : this.toolValue === 'wire' ? 'crosshair' : this.toolValue === 'label' ? 'text' : this.toolValue === 'component' ? 'copy' : 'default';
+        this.shell.style.cursor = cursorForTool(this.toolValue);
       }
     });
   }

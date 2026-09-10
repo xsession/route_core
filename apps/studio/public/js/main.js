@@ -214,6 +214,14 @@ class StudioApplication {
             document.documentElement.style.setProperty('--bottom-height', `${bottom}px`);
     }
     bindStaticUi() {
+        const spatialHost = byId('spatial-host');
+        for (const eventName of ['pointerdown', 'pointermove', 'pointerup', 'pointercancel', 'wheel', 'dblclick']) {
+            spatialHost.addEventListener(eventName, (event) => event.stopPropagation());
+        }
+        spatialHost.addEventListener('contextmenu', (event) => {
+            event.preventDefault();
+            event.stopPropagation();
+        });
         byId('new-project').addEventListener('click', () => void this.newProjectDialog());
         byId('open-project').addEventListener('click', () => void this.openProjectDialog());
         byId('checkpoint-project').addEventListener('click', () => void this.checkpoint());
@@ -230,7 +238,7 @@ class StudioApplication {
         byId('zoom-out').addEventListener('click', () => this.host.zoomAtCenter(1 / 1.2));
         byId('zoom-in').addEventListener('click', () => this.host.zoomAtCenter(1.2));
         byId('zoom-readout').addEventListener('click', () => this.host.resetZoom());
-        byId('fit-view').addEventListener('click', () => this.host.fit());
+        byId('fit-view').addEventListener('click', () => this.spatialMode ? this.spatialEditor?.fit() : this.host.fit());
         byId('toggle-theme').addEventListener('click', () => void this.toggleTheme());
         byId('toggle-grid').addEventListener('click', () => {
             const value = this.host.toggleGrid();
@@ -278,7 +286,7 @@ class StudioApplication {
         byId('view-tabs').addEventListener('click', (event) => {
             const spatial = event.target.closest('[data-spatial-view]');
             if (spatial) {
-                this.openSpatialView();
+                void this.openSpatialView();
                 return;
             }
             const button = event.target.closest('[data-page-id]');
@@ -578,6 +586,7 @@ class StudioApplication {
         ${fieldRow('Model', `<div class="readout">${escapeHtml(state.productModel?.name || 'Built-in fit-check fixture')}</div>`)}
         <input id="spatial-product-file" type="file" accept=".glb,model/gltf-binary" hidden />
         <div class="button-row start"><button class="primary-button" data-action="spatial-import">Import GLB</button><button class="secondary-button" data-action="spatial-fit">Fit all</button></div>
+        ${state.productModel ? fieldRow('Source unit in mm', textControl('spatial-source-scale', state.productModel.sourceUnitScaleMm, { type: 'number', min: 0.000001, step: 0.1 })) : ''}
         ${fieldRow('Product opacity', textControl('spatial-opacity', state.productModel?.opacity ?? 0.42, { type: 'number', min: 0.05, max: 1, step: 0.05 }))}
         ${fieldRow('Section plane', selectControl('spatial-section-axis', 'none', ['none', 'x', 'y', 'z']))}
         ${fieldRow('Section offset mm', textControl('spatial-section-offset', 0, { type: 'number', step: 10 }))}
@@ -951,9 +960,33 @@ class StudioApplication {
             if (!file)
                 return;
             try {
-                await this.spatialEditor.importProduct(file);
+                if (!file.name.toLowerCase().endsWith('.glb'))
+                    throw new Error('Use a self-contained binary glTF (.glb) product model.');
+                if (file.size > 16 * 1024 * 1024)
+                    throw new Error('The GLB must be 16 MB or smaller. Decimate the review model before importing it.');
+                const parameters = new URLSearchParams({
+                    modelId: this.workspace.workspace.activeModelId || '',
+                    filename: file.name,
+                    role: 'spatial-product-model',
+                });
+                const asset = await this.api.request(`/api/project/assets?${parameters.toString()}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'model/gltf-binary' },
+                    body: file,
+                });
+                const productModel = {
+                    assetId: asset.id,
+                    contentHash: asset.sha256,
+                    byteLength: asset.byteLength,
+                    name: asset.originalFilename,
+                    mediaType: 'model/gltf-binary',
+                    sourceUnitScaleMm: 1000,
+                    modelToHarnessTransform: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1],
+                    opacity: 0.42,
+                };
+                this.spatialEditor.setProductModel(productModel);
                 this.renderInspector();
-                toast('3D product imported', `${file.name} is embedded in the project for offline fit checks.`, 'success');
+                toast('3D product imported', `${file.name} is stored once in the project database for offline fit checks.`, 'success');
             }
             catch (error) {
                 toast('3D import failed', errorMessage(error), 'error');
@@ -970,6 +1003,8 @@ class StudioApplication {
             this.spatialEditor.updateSelectedCable({ minimumBendRadiusMm: Number(input.value) });
         if (input.id === 'spatial-surface-mode')
             this.spatialEditor.updateSelectedCable({ surfaceMode: input.value });
+        if (input.id === 'spatial-source-scale')
+            this.spatialEditor.setProductUnitScale(Number(input.value));
         if (input.id === 'spatial-opacity')
             this.spatialEditor.setProductOpacity(Number(input.value));
         if (input.id === 'spatial-section-axis' || input.id === 'spatial-section-offset') {
@@ -1588,10 +1623,16 @@ class StudioApplication {
             return;
         await this.switchView(modelId, preferred.id, preferred.viewKind);
     }
-    openSpatialView() {
+    async openSpatialView() {
         const model = this.workspace.models.find((value) => value.id === this.workspace.workspace.activeModelId);
         if (model?.kind !== 'assembly')
             return;
+        if (this.workspace.workspace.activeViewKind !== 'layout') {
+            const layout = pageForView(this.workspace, model.id, 'layout');
+            if (!layout)
+                return;
+            await this.switchView(model.id, layout.id, 'layout');
+        }
         const document = this.host.engine.document;
         const previous = document.metadata?.spatialHarness;
         const state = createSpatialHarnessDocument(document, previous);
@@ -1614,24 +1655,28 @@ class StudioApplication {
                 },
             });
         }
-        this.spatialMode = true;
         this.spatialSelection = { cableId: state.cableOrder[0] || null, pointIndex: null };
         this.spatialEditor.setState(state);
+        this.spatialMode = true;
+        this.host.setInputEnabled(false);
         byId('canvas-shell').dataset.spatial = 'true';
         byId('spatial-host').hidden = false;
         byId('tool-rail').hidden = true;
         this.renderViewTabs();
         this.renderBreadcrumb();
         this.renderInspector();
+        this.updateCommandStates();
         this.setStatus('3D product fit-check editor · drag blue path control points to shape the harness.');
     }
     closeSpatialView() {
+        this.host?.setInputEnabled(true);
         if (!this.spatialMode)
             return;
         this.spatialMode = false;
         delete byId('canvas-shell').dataset.spatial;
         byId('spatial-host').hidden = true;
         byId('tool-rail').hidden = false;
+        this.updateCommandStates();
     }
     async addDrawingElement(kind) {
         const document = this.host.engine.document;
@@ -1780,11 +1825,14 @@ class StudioApplication {
     }
     updateCommandStates() {
         const primary = this.host?.engine.selection.primary;
-        byId('undo').disabled = !this.host?.engine.canUndo;
-        byId('redo').disabled = !this.host?.engine.canRedo;
-        byId('rotate-selection').disabled = !this.host?.engine.selection.items.some((item) => item.kind === 'component');
-        byId('tool-delete').disabled = !primary;
-        byId('auto-route').disabled = Boolean(primary) && !this.host?.engine.selection.items.some((item) => item.kind === 'wire');
+        byId('undo').disabled = this.spatialMode || !this.host?.engine.canUndo;
+        byId('redo').disabled = this.spatialMode || !this.host?.engine.canRedo;
+        byId('rotate-selection').disabled = this.spatialMode || !this.host?.engine.selection.items.some((item) => item.kind === 'component');
+        byId('tool-delete').disabled = this.spatialMode || !primary;
+        byId('auto-route').disabled = this.spatialMode || Boolean(primary) && !this.host?.engine.selection.items.some((item) => item.kind === 'wire');
+        for (const id of ['add-component', 'add-label', 'zoom-out', 'zoom-in', 'zoom-readout', 'toggle-grid', 'toggle-snap', 'tool-route']) {
+            byId(id).disabled = this.spatialMode;
+        }
     }
     updateDocumentStatus() {
         const revision = this.host?.engine.document.revision ?? this.workspace.editor.document.revision;
@@ -3091,6 +3139,13 @@ class StudioApplication {
         if (ctrl && event.shiftKey && key === 'e') {
             event.preventDefault();
             void this.exportsDialog();
+            return;
+        }
+        if (this.spatialMode) {
+            if (!ctrl && key === 'f') {
+                event.preventDefault();
+                this.spatialEditor?.fit();
+            }
             return;
         }
         if (ctrl && key === 'd') {

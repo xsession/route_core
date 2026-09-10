@@ -1,4 +1,5 @@
-import { createReadStream, existsSync, statSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { createReadStream, existsSync, readFileSync, statSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { extname, join, normalize, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -6,6 +7,10 @@ import { availableExports, generateExport } from './exporters.mjs';
 
 const publicDirectory = fileURLToPath(new URL('../public/', import.meta.url));
 const maximumBodyBytes = 24 * 1024 * 1024;
+const indexHtml = readFileSync(join(publicDirectory, 'index.html'), 'utf8');
+const importMapSource = indexHtml.match(/<script\b[^>]*\btype=["']importmap["'][^>]*>([\s\S]*?)<\/script>/iu)?.[1];
+if (importMapSource === undefined) throw new Error('The application import map is missing from index.html.');
+const importMapCspHash = `sha256-${createHash('sha256').update(importMapSource).digest('base64')}`;
 
 const mediaTypes = new Map([
   ['.html', 'text/html; charset=utf-8'],
@@ -27,7 +32,7 @@ function securityHeaders(response) {
   response.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), payment=(), usb=()');
   response.setHeader(
     'Content-Security-Policy',
-    "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' data: blob:; font-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'",
+    `default-src 'self'; script-src 'self' '${importMapCspHash}'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' data: blob:; font-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'`,
   );
   response.setHeader('Cross-Origin-Resource-Policy', 'same-origin');
 }

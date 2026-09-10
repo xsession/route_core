@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -73,7 +74,14 @@ test('loopback HTTP application serves secure offline APIs and assets', async ()
 
     const index = await fetch(`${base}/`);
     assert.equal(index.status, 200);
-    assert.match(await index.text(), /RouteCore Offline Studio/);
+    const indexHtml = await index.text();
+    assert.match(indexHtml, /RouteCore Offline Studio/);
+    const importMapSource = indexHtml.match(/<script\b[^>]*\btype=["']importmap["'][^>]*>([\s\S]*?)<\/script>/iu)?.[1];
+    assert.notEqual(importMapSource, undefined);
+    const importMapHash = `sha256-${createHash('sha256').update(importMapSource).digest('base64')}`;
+    const indexPolicy = index.headers.get('content-security-policy') || '';
+    assert.ok(indexPolicy.includes(`script-src 'self' '${importMapHash}'`), 'CSP must authorize the exact inline import map');
+    assert.doesNotMatch(indexPolicy.match(/script-src[^;]*/u)?.[0] || '', /'unsafe-inline'/u);
 
     const settings = await fetch(`${base}/api/settings`, {
       method: 'PUT',

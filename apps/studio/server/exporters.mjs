@@ -100,11 +100,14 @@ export function availableExports() {
   return [
     { id: 'editor-json', label: 'Editor document JSON', extension: 'json', mediaType: 'application/json' },
     { id: 'project-json', label: 'Complete project interchange JSON', extension: 'json', mediaType: 'application/json' },
-    { id: 'svg', label: 'Vector drawing SVG', extension: 'svg', mediaType: 'image/svg+xml' },
+    { id: 'svg', label: 'Vector drawing SVG (with tables)', extension: 'svg', mediaType: 'image/svg+xml' },
     { id: 'bom-csv', label: 'Bill of materials CSV', extension: 'csv', mediaType: 'text/csv' },
-    { id: 'cut-list-csv', label: 'Wire cut list CSV', extension: 'csv', mediaType: 'text/csv' },
+    { id: 'cut-list-csv', label: 'Wire cut list CSV (set lengths)', extension: 'csv', mediaType: 'text/csv' },
     { id: 'pinout-csv', label: 'Component pinout CSV', extension: 'csv', mediaType: 'text/csv' },
     { id: 'continuity-csv', label: 'Continuity schedule CSV', extension: 'csv', mediaType: 'text/csv' },
+    { id: 'connection-table-csv', label: 'Connection table CSV', extension: 'csv', mediaType: 'text/csv' },
+    { id: 'tools-csv', label: 'Tools and fixtures CSV', extension: 'csv', mediaType: 'text/csv' },
+    { id: 'formboard-json', label: 'Digital formboard JSON (1:1 panels)', extension: 'json', mediaType: 'application/json' },
     { id: 'netlist-json', label: 'Connectivity netlist JSON', extension: 'json', mediaType: 'application/json' },
   ];
 }
@@ -135,6 +138,10 @@ export function generateExport(project, format, options = {}) {
       modelsAndPages: project.listModelsAndPages(),
       documents: project.listEditorDocuments(),
       bom: project.listBomItems(),
+      partConfigurations: project.listPartConfigurations(),
+      toolFixtures: project.listToolFixtures(),
+      formboard: { config: project.getFormboardConfig() },
+      projectSettings: ['formboard', 'designation', 'manufacturing'].map((key) => ({ key, value: project.getProjectSetting(key, null) })),
       revisions: project.listRevisions(),
       commandLog: project.getCommandLog(250),
     };
@@ -147,11 +154,13 @@ export function generateExport(project, format, options = {}) {
 
   if (format === 'svg') {
     const scene = deriveEditorScene(document, { autoRoute: true, validate: true, contentPadding: 60 });
+    const drawingElements = project.listDrawingElements(editor.modelId, editor.pageId);
     const svg = renderEditorSvg(scene.document, {
       geometries: scene.componentGeometries,
       labelPlacements: scene.labelPlacementList,
       selection: { items: [] },
       theme: DEFAULT_EDITOR_THEME,
+      drawingElements,
       options: {
         viewport: scene.contentBounds,
         showGrid: options.showGrid === true,
@@ -180,8 +189,11 @@ export function generateExport(project, format, options = {}) {
   }
 
   if (format === 'cut-list-csv') {
+    const formboard = project.getFormboard(editor.modelId);
+    const byId = new Map(formboard.wires.map((wire) => [wire.wireId, wire]));
     const rows = document.wireOrder.map((wireId, index) => {
       const wire = document.wires[wireId];
+      const detail = byId.get(wireId) || {};
       return [
         index + 1,
         wireId,
@@ -190,7 +202,10 @@ export function generateExport(project, format, options = {}) {
         wire.kind,
         endpointName(document, wire.source),
         endpointName(document, wire.target),
-        wireLength(wire).toFixed(2),
+        Number(detail.routedLengthMm ?? wireLength(wire)).toFixed(2),
+        detail.setLengthMm ?? Math.ceil(wireLength(wire) / formboard.config.setLengthStepMm) * formboard.config.setLengthStepMm,
+        detail.bendCount ?? wire.route?.bends ?? 0,
+        detail.status || 'unrouted',
         document.metadata?.units || 'mm',
         wire.style?.pattern?.kind || 'solid',
         wire.routing?.pattern || 'orthogonal',
@@ -201,9 +216,92 @@ export function generateExport(project, format, options = {}) {
       filename: `${safeName}-cut-list.csv`,
       mediaType: 'text/csv; charset=utf-8',
       body: csv([
-        ['Item', 'Wire ID', 'Label', 'Signal', 'Kind', 'From', 'To', 'Calculated length', 'Unit', 'Color pattern', 'Routing pattern', 'Route status'],
+        ['Item', 'Wire ID', 'Label', 'Signal', 'Kind', 'From', 'To', 'Routed length', 'Cut/set length', 'Bends', 'Formboard state', 'Unit', 'Color pattern', 'Routing pattern', 'Route status'],
         ...rows,
       ]),
+    };
+  }
+
+  if (format === 'connection-table-csv') {
+    const destination = (componentId, portId) => {
+      for (const wireId of document.wireOrder) {
+        const wire = document.wires[wireId];
+        const at = (endpoint) => endpoint.kind === 'port' && endpoint.componentId === componentId && endpoint.portId === portId;
+        if (at(wire.source) || at(wire.target)) {
+          const other = at(wire.source) ? wire.target : wire.source;
+          if (other.kind === 'port') {
+            const component = document.components[other.componentId];
+            return `${component?.designator || other.componentId}.${component?.ports.find((port) => port.id === other.portId)?.label || other.portId}`;
+          }
+          return other.kind;
+        }
+      }
+      return '';
+    };
+    const rows = [];
+    for (const componentId of document.componentOrder) {
+      const component = document.components[componentId];
+      component.ports.forEach((port, index) => rows.push([
+        component.designator,
+        index + 1,
+        port.label,
+        port.function || '',
+        destination(componentId, port.id),
+      ]));
+    }
+    return {
+      filename: `${safeName}-connection-table.csv`,
+      mediaType: 'text/csv; charset=utf-8',
+      body: csv([
+        ['Component', 'Pin', 'Function', 'Destination', 'Wire'],
+        ...rows,
+      ]),
+    };
+  }
+
+  if (format === 'tools-csv') {
+    const tools = project.listToolFixtures(editor.modelId);
+    return {
+      filename: `${safeName}-tools.csv`,
+      mediaType: 'text/csv; charset=utf-8',
+      body: csv([
+        ['Key', 'Name', 'Kind', 'Part number', 'Quantity', 'Location', 'Description'],
+        ...tools.map((tool) => [tool.toolKey, tool.name, tool.kind, tool.partNumber, tool.quantity, tool.locationNote, tool.description]),
+      ]),
+    };
+  }
+
+  if (format === 'formboard-json') {
+    const board = project.getFormboard(editor.modelId);
+    const payload = {
+      schema: 'routecore-formboard/1',
+      exportedAt: new Date().toISOString(),
+      project: meta.name,
+      modelId: board.modelId,
+      config: board.config,
+      panel: board.panel,
+      totals: board.totals,
+      wires: board.wires.map((wire) => ({
+        id: wire.wireId,
+        label: wire.label,
+        signal: wire.signal,
+        from: wire.from,
+        to: wire.to,
+        routedLengthMm: wire.routedLengthMm,
+        setLengthMm: wire.setLengthMm,
+        bends: wire.bendCount,
+        minimumBendRadiusMm: wire.minimumBendRadiusMm,
+        status: wire.status,
+        // Panel-local geometry: route points are in layout logical units (mm at
+        // 1:1) relative to the panel origin, ready for projection onto 1:1
+        // formboard panels.
+        points: wire.points,
+      })),
+    };
+    return {
+      filename: `${safeName}-formboard.json`,
+      mediaType: 'application/json; charset=utf-8',
+      body: `${JSON.stringify(payload, null, 2)}\n`,
     };
   }
 

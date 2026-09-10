@@ -4,6 +4,7 @@ import {
   HarnessEditorEngine,
   buildComponentGeometry,
   createEmptyDocument,
+  deriveEditorScene,
   parseDocument,
 } from '../../../packages/harness-editor-core/dist/index.js';
 import { createProjectDocument, createSchematicFromLayout } from './sample-data.mjs';
@@ -20,6 +21,7 @@ const schemaFiles = [
   new URL('../../../database/0001_project.sql', import.meta.url),
   new URL('../../../database/0002_editor.sql', import.meta.url),
   new URL('../../../database/0003_application.sql', import.meta.url),
+  new URL('../../../database/0004_manufacturing.sql', import.meta.url),
 ];
 
 function booleanInteger(value) {
@@ -365,7 +367,7 @@ export class ProjectDatabase {
     this.database.exec('PRAGMA foreign_keys = ON; PRAGMA busy_timeout = 5000;');
     if (wasEmpty || options.create) this.applyAllSchemas();
     else this.applyMissingSchemas();
-    this.database.exec('PRAGMA application_id = 1381253970; PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL; PRAGMA temp_store = MEMORY; PRAGMA user_version = 3;');
+    this.database.exec('PRAGMA application_id = 1381253970; PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL; PRAGMA temp_store = MEMORY; PRAGMA user_version = 4;');
   }
 
   close() {
@@ -1392,6 +1394,13 @@ export class ProjectDatabase {
     if (!generated.document.componentOrder.length) {
       throw new Error('Select at least one component before generating an assembly.');
     }
+    const prefix = String(input.designatorPrefix || '').trim();
+    if (prefix) {
+      for (const componentId of generated.document.componentOrder) {
+        const component = generated.document.components[componentId];
+        if (component.designator) component.designator = `${prefix}-${component.designator}`;
+      }
+    }
     const schematic = createSchematicFromLayout(generated.document);
     const assemblyId = createId('assembly');
     const layoutPageId = createId('page-layout');
@@ -1551,6 +1560,54 @@ export class ProjectDatabase {
           const endpoint = (value) => value.kind === 'port' ? `${editor.components[value.componentId]?.designator || value.componentId}.${editor.components[value.componentId]?.ports.find((port) => port.id === value.portId)?.label || value.portId}` : value.kind;
           return [wire.label || id, wire.signal || '—', endpoint(wire.source), endpoint(wire.target)];
         });
+      } else if (row.element_kind === 'cut_list' && editor) {
+        const formboard = this.getFormboard(selectedModelId);
+        const byId = new Map(formboard.wires.map((wire) => [wire.wireId, wire]));
+        content.columns = ['WIRE', 'SIGNAL', 'FROM', 'TO', 'LENGTH MM', 'SET MM', 'BENDS'];
+        content.rows = editor.wireOrder.map((id) => {
+          const wire = editor.wires[id];
+          const detail = byId.get(id) || {};
+          return [wire.label || id, wire.signal || '—', detail.from || '—', detail.to || '—', detail.routedLengthMm ?? 0, detail.setLengthMm ?? 0, detail.bendCount ?? 0];
+        });
+      } else if (row.element_kind === 'connection_table' && editor) {
+        const destination = (componentId, portId) => {
+          for (const wireId of editor.wireOrder) {
+            const wire = editor.wires[wireId];
+            const at = (endpoint) => endpoint.kind === 'port' && endpoint.componentId === componentId && endpoint.portId === portId;
+            if (at(wire.source) || at(wire.target)) {
+              const other = at(wire.source) ? wire.target : wire.source;
+              if (other.kind === 'port') {
+                const component = editor.components[other.componentId];
+                return `${component?.designator || other.componentId}.${component?.ports.find((port) => port.id === other.portId)?.label || other.portId}`;
+              }
+              return other.kind;
+            }
+          }
+          return '—';
+        };
+        content.columns = ['COMPONENT', 'PIN', 'FUNCTION', 'DESTINATION', 'WIRE'];
+        content.rows = [];
+        for (const componentId of editor.componentOrder) {
+          const component = editor.components[componentId];
+          for (const port of component.ports || []) {
+            content.rows.push([component.designator || componentId, port.label, port.function || '—', destination(componentId, port.id), '—']);
+          }
+        }
+      } else if (row.element_kind === 'continuity_table' && editor) {
+        content.columns = ['TEST', 'SIGNAL', 'POINT A', 'POINT B', 'EXPECTED', 'RESULT'];
+        content.rows = editor.wireOrder.map((id, index) => {
+          const wire = editor.wires[id];
+          const endpoint = (value) => value.kind === 'port' ? `${editor.components[value.componentId]?.designator || value.componentId}.${editor.components[value.componentId]?.ports.find((port) => port.id === value.portId)?.label || value.portId}` : value.kind;
+          return [String(index + 1), wire.signal || wire.label || '—', endpoint(wire.source), endpoint(wire.target), 'CLOSED', ''];
+        });
+      } else if (row.element_kind === 'revision_table') {
+        const revisions = this.listRevisions(selectedModelId).slice(0, 12);
+        content.columns = ['REV', 'NAME', 'STATE', 'DATE'];
+        content.rows = revisions.map((revision) => [revision.name, revision.message || '—', revision.lifecycleState, (revision.createdAt || '').slice(0, 10)]);
+      } else if (row.element_kind === 'custom' && content.title?.toUpperCase() === 'TOOLS & FIXTURES') {
+        const tools = this.listToolFixtures(selectedModelId);
+        content.columns = ['NAME', 'KIND', 'P/N', 'QTY', 'LOCATION'];
+        content.rows = tools.map((tool) => [tool.name, tool.kind, tool.partNumber || '—', String(tool.quantity), tool.locationNote || '—']);
       } else if (row.element_kind === 'title_block') {
         content.title = content.title || model?.name || 'ASSEMBLY DRAWING';
         content.text = `${model?.designator || 'ASSEMBLY'} · ${model?.lifecycle_state || 'draft'} · ${revision?.revision_name || 'unrevisioned'}`;
@@ -1561,7 +1618,7 @@ export class ProjectDatabase {
       }
       return {
         id: row.id,
-        kind: ({ title_block: 'title-block', bom_table: 'bom-table', wire_schedule: 'wire-schedule', note: 'leader-note' })[row.element_kind] || row.element_kind,
+        kind: ({ title_block: 'title-block', bom_table: 'bom-table', wire_schedule: 'wire-schedule', cut_list: 'cut-list', connection_table: 'connection-table', continuity_table: 'continuity-table', revision_table: 'revision-table', note: 'leader-note' })[row.element_kind] || row.element_kind,
         x: row.x_lu,
         y: row.y_lu,
         width: row.width_lu,
@@ -1584,8 +1641,8 @@ export class ProjectDatabase {
     `).get(modelId, pageId);
     if (!model) throw new Error('Select a layout page before adding drawing content.');
     const sheetId = this.ensureLayoutSheet(modelId, pageId, model.name);
-    const kind = ({ 'title-block': 'title_block', 'bom-table': 'bom_table', 'wire-schedule': 'wire_schedule', 'leader-note': 'note' })[input.kind] || input.kind;
-    const allowed = new Set(['dimension', 'note', 'title_block', 'bom_table', 'wire_schedule']);
+    const kind = ({ 'title-block': 'title_block', 'bom-table': 'bom_table', 'wire-schedule': 'wire_schedule', 'cut-list': 'cut_list', 'connection-table': 'connection_table', 'continuity-table': 'continuity_table', 'revision-table': 'revision_table', 'leader-note': 'note' })[input.kind] || input.kind;
+    const allowed = new Set(['dimension', 'note', 'title_block', 'bom_table', 'wire_schedule', 'cut_list', 'connection_table', 'continuity_table', 'revision_table', 'custom']);
     if (!allowed.has(kind)) throw new Error(`Unsupported drawing element kind: ${String(input.kind)}`);
     const id = input.id || createId('drawing');
     const zOrder = Number.isFinite(Number(input.zOrder)) ? Number(input.zOrder) : Number(this.database.prepare('SELECT coalesce(max(z_order), 0) + 1 AS value FROM layout_element WHERE sheet_id = ?').get(sheetId).value);
@@ -2059,5 +2116,261 @@ export class ProjectDatabase {
   checkpoint() {
     const result = this.database.prepare('PRAGMA wal_checkpoint(TRUNCATE)').all();
     return { result, integrity: this.integrityCheck() };
+  }
+
+  getProjectSetting(key, fallback = null) {
+    const row = this.database.prepare('SELECT value_json FROM project_setting WHERE key = ?').get(key);
+    if (!row) return fallback;
+    try {
+      return JSON.parse(row.value_json);
+    } catch {
+      return fallback;
+    }
+  }
+
+  setProjectSetting(key, value) {
+    const now = nowIso();
+    this.database.prepare(`
+      INSERT INTO project_setting(key, value_json, modified_at) VALUES (?, ?, ?)
+      ON CONFLICT(key) DO UPDATE SET value_json = excluded.value_json, modified_at = excluded.modified_at
+    `).run(key, JSON.stringify(value ?? {}), now);
+    return this.getProjectSetting(key, null);
+  }
+
+  getFormboardConfig() {
+    const defaults = {
+      rows: 1,
+      columns: 1,
+      panelWidthMm: 1000,
+      panelHeightMm: 1500,
+      bendRadiusMm: 12,
+      setLengthStepMm: 10,
+      tolerancePpm: 50000,
+    };
+    return { ...defaults, ...this.getProjectSetting('formboard', {}) };
+  }
+
+  getFormboard(modelId = null) {
+    const selectedModelId = modelId || this.getWorkspaceState().activeModelId;
+    if (!selectedModelId) throw new Error('Select a model before computing a formboard.');
+    const editor = this.loadEditorDocument({ modelId: selectedModelId, viewKind: 'layout' });
+    const document = editor.document;
+    const config = this.getFormboardConfig();
+    const step = Math.max(1, Number(config.setLengthStepMm) || 10);
+    const setLength = (lengthMm) => Math.ceil(lengthMm / step) * step;
+    // Persisted documents may predate the last routing pass; derive routed
+    // geometry the same way the canvas and SVG export do so lengths are live.
+    const scene = deriveEditorScene(document, { autoRoute: true });
+    const routedWires = scene.document.wires;
+    const endpoint = (value) => value.kind === 'port'
+      ? `${document.components[value.componentId]?.designator || value.componentId}.${document.components[value.componentId]?.ports.find((port) => port.id === value.portId)?.label || value.portId}`
+      : value.kind === 'off-page' ? `off-page:${value.reference || ''}` : value.kind;
+    const wires = document.wireOrder.map((id) => {
+      const wire = routedWires[id] || document.wires[id];
+      const lengthMm = Number(wire.route?.length || 0);
+      const setLengthMm = setLength(lengthMm);
+      const deltaPpm = setLengthMm > 0 ? (setLengthMm - lengthMm) / setLengthMm * 1000000 : 0;
+      const status = lengthMm <= 0 ? 'unrouted' : deltaPpm <= config.tolerancePpm ? 'to-scale' : 'not-to-scale';
+      return {
+        wireId: id,
+        label: wire.label || id,
+        signal: wire.signal || '',
+        from: endpoint(wire.source),
+        to: endpoint(wire.target),
+        routedLengthMm: Math.round(lengthMm * 100) / 100,
+        setLengthMm,
+        bendCount: wire.route?.bends ?? 0,
+        minimumBendRadiusMm: Math.max(Number(config.bendRadiusMm) || 0, Number(wire.routing?.requestedRadius) || 0),
+        points: (wire.route?.points || []).map((point) => ({ x: Math.round(point.x * 100) / 100, y: Math.round(point.y * 100) / 100 })),
+        status,
+      };
+    });
+    return {
+      modelId: selectedModelId,
+      config,
+      panel: { rows: config.rows, columns: config.columns, widthMm: config.panelWidthMm, heightMm: config.panelHeightMm },
+      totals: {
+        wireCount: wires.length,
+        routedLengthMm: Math.round(wires.reduce((sum, wire) => sum + wire.routedLengthMm, 0) * 100) / 100,
+        setLengthMm: wires.reduce((sum, wire) => sum + wire.setLengthMm, 0),
+        bendCount: wires.reduce((sum, wire) => sum + wire.bendCount, 0),
+        toScale: wires.filter((wire) => wire.status === 'to-scale').length,
+      },
+      wires,
+    };
+  }
+
+  listPartConfigurations(modelId = null) {
+    const rows = modelId
+      ? this.database.prepare('SELECT * FROM app_part_configuration WHERE model_id = ? ORDER BY entity_kind, entity_id, config_key').all(modelId)
+      : this.database.prepare('SELECT * FROM app_part_configuration ORDER BY model_id, entity_kind, entity_id, config_key').all();
+    return rows.map((row) => ({
+      id: row.id,
+      modelId: row.model_id,
+      entityKind: row.entity_kind,
+      entityId: row.entity_id,
+      configKey: row.config_key,
+      name: row.name,
+      description: row.description,
+      designationStrategy: row.designation_strategy,
+      gridRows: row.grid_rows,
+      gridColumns: row.grid_columns,
+      isDefault: Boolean(row.is_default),
+      properties: JSON.parse(row.properties_json),
+      createdAt: row.created_at,
+      modifiedAt: row.modified_at,
+    }));
+  }
+
+  savePartConfiguration(input = {}) {
+    const modelId = input.modelId || this.getWorkspaceState().activeModelId;
+    if (!modelId) throw new Error('A model is required for a part configuration.');
+    if (!input.entityId || !input.configKey) throw new Error('Part configurations require an entity and a configuration key.');
+    const id = input.id || createId('part-config');
+    const now = nowIso();
+    const strategy = ['custom', 'sequential', 'alphabetical', 'grid', 'source'].includes(input.designationStrategy)
+      ? input.designationStrategy
+      : 'custom';
+    if (input.isDefault) {
+      this.database.prepare('UPDATE app_part_configuration SET is_default = 0 WHERE model_id = ? AND entity_kind = ? AND entity_id = ?')
+        .run(modelId, input.entityKind || 'component', input.entityId);
+    }
+    this.database.prepare(`
+      INSERT INTO app_part_configuration(
+        id, model_id, entity_kind, entity_id, config_key, name, description,
+        designation_strategy, grid_rows, grid_columns, properties_json, is_default, created_at, modified_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(model_id, entity_kind, entity_id, config_key) DO UPDATE SET
+        name = excluded.name, description = excluded.description,
+        designation_strategy = excluded.designation_strategy, grid_rows = excluded.grid_rows,
+        grid_columns = excluded.grid_columns, properties_json = excluded.properties_json,
+        is_default = excluded.is_default, modified_at = excluded.modified_at
+    `).run(
+      id, modelId, input.entityKind || 'component', input.entityId, input.configKey,
+      input.name || input.configKey, input.description || '', strategy,
+      input.gridRows ? Math.round(Number(input.gridRows)) : null,
+      input.gridColumns ? Math.round(Number(input.gridColumns)) : null,
+      JSON.stringify(input.properties || {}), booleanInteger(input.isDefault), now, now,
+    );
+    return this.listPartConfigurations(modelId)
+      .find((row) => row.id === id)
+      || this.listPartConfigurations(modelId).find((row) => row.entityId === input.entityId && row.configKey === input.configKey);
+  }
+
+  deletePartConfiguration(id) {
+    return this.database.prepare('DELETE FROM app_part_configuration WHERE id = ?').run(id).changes > 0;
+  }
+
+  listToolFixtures(modelId = null) {
+    const rows = modelId
+      ? this.database.prepare('SELECT * FROM app_tool_fixture WHERE model_id = ? ORDER BY kind, name').all(modelId)
+      : this.database.prepare('SELECT * FROM app_tool_fixture ORDER BY model_id, kind, name').all();
+    return rows.map((row) => ({
+      id: row.id,
+      modelId: row.model_id,
+      toolKey: row.tool_key,
+      name: row.name,
+      kind: row.kind,
+      partNumber: row.part_number,
+      description: row.description,
+      bundleId: row.bundle_id,
+      quantity: row.quantity,
+      locationNote: row.location_note,
+      properties: JSON.parse(row.properties_json),
+      createdAt: row.created_at,
+      modifiedAt: row.modified_at,
+    }));
+  }
+
+  saveToolFixture(input = {}) {
+    const modelId = input.modelId || this.getWorkspaceState().activeModelId;
+    if (!modelId) throw new Error('A model is required for a tool or fixture.');
+    if (!input.name) throw new Error('Tools and fixtures require a name.');
+    const id = input.id || createId('tool');
+    const now = nowIso();
+    const kind = ['tool', 'fixture', 'equipment', 'consumable'].includes(input.kind) ? input.kind : 'tool';
+    this.database.prepare(`
+      INSERT INTO app_tool_fixture(
+        id, model_id, tool_key, name, kind, part_number, description,
+        bundle_id, quantity, location_note, properties_json, created_at, modified_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(model_id, tool_key) DO UPDATE SET
+        name = excluded.name, kind = excluded.kind, part_number = excluded.part_number,
+        description = excluded.description, bundle_id = excluded.bundle_id, quantity = excluded.quantity,
+        location_note = excluded.location_note, properties_json = excluded.properties_json,
+        modified_at = excluded.modified_at
+    `).run(
+      id, modelId, input.toolKey || id, input.name, kind, input.partNumber || '',
+      input.description || '', input.bundleId || null,
+      Math.max(1, Math.round(Number(input.quantity) || 1)), input.locationNote || '',
+      JSON.stringify(input.properties || {}), now, now,
+    );
+    return this.listToolFixtures(modelId).find((row) => row.id === id);
+  }
+
+  deleteToolFixture(id) {
+    return this.database.prepare('DELETE FROM app_tool_fixture WHERE id = ?').run(id).changes > 0;
+  }
+
+  whereUsed(modelId, term) {
+    const needle = String(term || '').trim().toLowerCase();
+    const results = { query: needle, modelId: modelId || null, components: [], wires: [], bomItems: [] };
+    if (!needle) return results;
+    const documents = this.listEditorDocuments(modelId);
+    for (const envelope of documents) {
+      const document = envelope.document;
+      for (const componentId of document.componentOrder) {
+        const component = document.components[componentId];
+        if (!component) continue;
+        const fields = {
+          designator: component.designator || '',
+          title: component.labels?.title || '',
+          manufacturer: component.labels?.manufacturer || '',
+          partNumber: component.labels?.partNumber || '',
+        };
+        const match = Object.entries(fields).find(([, value]) => String(value).toLowerCase().includes(needle));
+        if (match) results.components.push({
+          modelId,
+          viewKind: envelope.viewKind,
+          componentId,
+          designator: component.designator || '',
+          title: component.labels?.title || '',
+          matchedField: match[0],
+          matchedValue: match[1],
+        });
+      }
+      for (const wireId of document.wireOrder) {
+        const wire = document.wires[wireId];
+        if (!wire) continue;
+        const label = String(wire.label || '');
+        const signal = String(wire.signal || '');
+        const match = label.toLowerCase().includes(needle)
+          ? ['label', label]
+          : signal.toLowerCase().includes(needle) ? ['signal', signal] : null;
+        if (match) results.wires.push({
+          modelId,
+          viewKind: envelope.viewKind,
+          wireId,
+          label,
+          signal,
+          matchedField: match[0],
+          matchedValue: match[1],
+        });
+      }
+    }
+    for (const item of this.listBomItems(modelId)) {
+      const fields = { partNumber: item.partNumber || '', manufacturer: item.manufacturer || '', description: item.description || '' };
+      const match = Object.entries(fields).find(([, value]) => String(value).toLowerCase().includes(needle));
+      if (match) results.bomItems.push({
+        id: item.id,
+        entityKind: item.entityKind,
+        entityId: item.entityId,
+        partNumber: item.partNumber,
+        description: item.description,
+        matchedField: match[0],
+        matchedValue: match[1],
+      });
+    }
+    return results;
   }
 }

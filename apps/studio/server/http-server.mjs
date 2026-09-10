@@ -279,6 +279,60 @@ async function handleApi(service, request, response, url) {
     jsonResponse(response, 200, { deleted: project().deleteBomItem(bomId) });
     return true;
   }
+  if (method === 'GET' && path === '/api/project/part-configurations') {
+    jsonResponse(response, 200, project().listPartConfigurations(url.searchParams.get('modelId') || undefined));
+    return true;
+  }
+  if (method === 'PUT' && path === '/api/project/part-configurations') {
+    jsonResponse(response, 200, project().savePartConfiguration(await readBody(request)));
+    return true;
+  }
+  const partConfigurationId = routeId(path, '/api/project/part-configurations/');
+  if (method === 'DELETE' && partConfigurationId) {
+    jsonResponse(response, 200, { deleted: project().deletePartConfiguration(partConfigurationId) });
+    return true;
+  }
+  if (method === 'GET' && path === '/api/project/tools') {
+    jsonResponse(response, 200, project().listToolFixtures(url.searchParams.get('modelId') || undefined));
+    return true;
+  }
+  if (method === 'PUT' && path === '/api/project/tools') {
+    jsonResponse(response, 200, project().saveToolFixture(await readBody(request)));
+    return true;
+  }
+  const toolId = routeId(path, '/api/project/tools/');
+  if (method === 'DELETE' && toolId) {
+    jsonResponse(response, 200, { deleted: project().deleteToolFixture(toolId) });
+    return true;
+  }
+  if (method === 'GET' && path === '/api/project/where-used') {
+    jsonResponse(response, 200, project().whereUsed(
+      url.searchParams.get('modelId') || undefined,
+      url.searchParams.get('q') || '',
+    ));
+    return true;
+  }
+  if (method === 'GET' && path === '/api/project/formboard') {
+    jsonResponse(response, 200, project().getFormboard(url.searchParams.get('modelId') || undefined));
+    return true;
+  }
+  if (method === 'GET' && path === '/api/project/settings') {
+    jsonResponse(response, 200, {
+      formboard: project().getFormboardConfig(),
+      designation: project().getProjectSetting('designation', null),
+      manufacturing: project().getProjectSetting('manufacturing', null),
+    });
+    return true;
+  }
+  if (method === 'PUT' && path === '/api/project/settings') {
+    const body = await readBody(request);
+    const updates = {};
+    for (const key of ['formboard', 'designation', 'manufacturing']) {
+      if (body[key] !== undefined) updates[key] = project().setProjectSetting(key, body[key]);
+    }
+    jsonResponse(response, 200, updates);
+    return true;
+  }
   if (method === 'GET' && path === '/api/library/components') {
     jsonResponse(response, 200, service.appDatabase.listComponents(url.searchParams.get('q') || ''));
     return true;

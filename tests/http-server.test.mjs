@@ -105,7 +105,7 @@ test('loopback HTTP application serves secure offline APIs and assets', async ()
     assert.equal((await settings.json()).theme, 'light');
 
     const exports = await (await fetch(`${base}/api/exports`)).json();
-    assert.equal(exports.length, 8);
+    assert.equal(exports.length, 11);
     const svg = await fetch(`${base}/api/export/svg`);
     assert.equal(svg.status, 200);
     assert.match(svg.headers.get('content-type') || '', /image\/svg\+xml/);

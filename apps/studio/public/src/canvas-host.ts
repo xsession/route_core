@@ -5,7 +5,9 @@ import {
   HarnessEditorEngine,
   ViewportController,
   contentBoundsFromSvgContext,
+  formatNumber,
   renderEditorSvg,
+  roundedOrthogonalPath,
   viewportWorldRect,
   type EditorDocument,
   type DrawingElement,
@@ -16,11 +18,16 @@ import {
   type SelectionRef,
   type SvgInteractionOverlay,
   type ViewportState,
+  type WireEdge,
 } from '../vendor/editor-core/index.js';
 import { clamp, isTextEntryTarget } from './dom.js';
 import type { EditorCallbacks, EditorTool } from './types.js';
 
 const EMPTY_OVERLAY: SvgInteractionOverlay = {};
+
+function escapeXmlAttr(value: string): string {
+  return value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
 
 function cursorForTool(tool: EditorTool): string {
   const cursors: Record<EditorTool, string> = {
@@ -60,6 +67,7 @@ export class CanvasHost {
   private viewportValue: ViewportController;
   private overlay: SvgInteractionOverlay = EMPTY_OVERLAY;
   private drawingElements: DrawingElement[] = [];
+  private harnessViewValue = false;
   private toolValue: EditorTool = 'select';
   private dark = true;
   private pointerCapture: number | null = null;
@@ -301,6 +309,13 @@ export class CanvasHost {
     this.engineValue.select(items, items[0]);
   }
 
+  /** Harness (loom) view: draws a cable sheath over every cable group in the schematic. */
+  public get harnessView(): boolean { return this.harnessViewValue; }
+  public setHarnessView(value: boolean): void {
+    this.harnessViewValue = value;
+    this.render();
+  }
+
   public render(): void {
     const document = this.engineValue.document as EditorDocument;
     const options: Partial<RenderOptions> = {
@@ -322,8 +337,56 @@ export class CanvasHost {
       overlay: this.overlay,
       drawingElements: this.drawingElements,
     });
+    this.applyLoomLayer(document);
     this.shell.style.background = this.dark ? DEFAULT_DARK_THEME.background : DEFAULT_LIGHT_THEME.background;
     this.emptyState.hidden = document.componentOrder.length > 0 || document.wireOrder.length > 0 || document.labelOrder.length > 0;
+  }
+
+  /**
+   * Harness (loom) overlay: groups the schematic's conductors by cable
+   * (metadata.cableDefinitionId) and, for every group of 2+ cores, paints a
+   * thick translucent sheath under the wires so the harness reads as a bundle
+   * — the standard loom grouping used in harness schematics. Rendered after
+   * the core SVG into a dedicated layer so hit-testing is unaffected.
+   */
+  private applyLoomLayer(doc: EditorDocument): void {
+    const svg = this.canvas.querySelector<SVGSVGElement>('svg');
+    const existing = svg?.querySelector<SVGGElement>('#routecore-loom-layer');
+    if (existing) existing.remove();
+    if (!svg || !this.harnessViewValue) return;
+    const groups = new Map<string, { name: string; wires: WireEdge[] }>();
+    for (const wire of doc.wireOrder.map((id) => doc.wires[id]).filter((wire): wire is WireEdge => Boolean(wire))) {
+      const groupKey = typeof wire.metadata?.cableDefinitionId === 'string' ? `def:${wire.metadata.cableDefinitionId}` :
+        typeof wire.metadata?.cableName === 'string' ? `name:${wire.metadata.cableName}` :
+          (wire.kind === 'cable-core' || wire.kind === 'bundle') ? 'unassigned' : null;
+      if (!groupKey) continue;
+      const group = groups.get(groupKey) || { name: typeof wire.metadata?.cableName === 'string' ? wire.metadata.cableName as string : 'Harness', wires: [] };
+      group.wires.push(wire);
+      groups.set(groupKey, group);
+    }
+    const layers: string[] = [];
+    let index = 0;
+    for (const [groupKey, group] of groups) {
+      const paths: string[] = [];
+      let maxOutline = 1;
+      for (const wire of group.wires) {
+        if (!wire.route?.points?.length || wire.hidden) continue;
+        paths.push(roundedOrthogonalPath(wire.route.points, wire.routing.requestedRadius).path);
+        maxOutline = Math.max(maxOutline, wire.style.outlineWidth);
+      }
+      if (paths.length < 2) continue;
+      const sheathWidth = Math.max(5, (maxOutline + 3) * paths.length * 0.72);
+      index += 1;
+      layers.push(`<g id="routecore-loom-${index}" data-loom="${escapeXmlAttr(groupKey)}" pointer-events="none"><title>${escapeXmlAttr(group.name)} — ${paths.length} cores</title>${paths.map((path) => `<path d="${path}" fill="none" stroke="${this.dark ? '#64748b' : '#475569'}" stroke-width="${formatNumber(sheathWidth)}" stroke-opacity="${this.dark ? 0.34 : 0.4}" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/><path d="${path}" fill="none" stroke="${this.dark ? '#94a3b8' : '#1e293b'}" stroke-opacity="0.25" stroke-width="${formatNumber(sheathWidth + 1.5)}" stroke-dasharray="10 6" vector-effect="non-scaling-stroke"/>`).join('')}</g>`);
+    }
+    if (!layers.length) return;
+    const layer = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    layer.id = 'routecore-loom-layer';
+    const wireLayer = svg.querySelector('#editor-core-wire-layer');
+    const fragment = document.createRange().createContextualFragment(`<g id="routecore-loom-inner">${layers.join('')}</g>`);
+    layer.append(fragment);
+    if (wireLayer?.parentNode) svg.insertBefore(layer, wireLayer);
+    else svg.append(layer);
   }
 
   private createInteraction(): EditorInteractionController {

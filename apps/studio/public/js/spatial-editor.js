@@ -13,6 +13,7 @@ export class SpatialHarnessEditor {
     transform;
     cableGroup = new THREE.Group();
     productGroup = new THREE.Group();
+    connectorGroup = new THREE.Group();
     cableMeshes = new Map();
     handles = new Map();
     raycaster = new THREE.Raycaster();
@@ -25,6 +26,10 @@ export class SpatialHarnessEditor {
     productLoaded = false;
     keepOutCache = new Map();
     dragOrigin = null;
+    sheathMeshes = new Map();
+    harnessModeValue = false;
+    cableGroups = new Map();
+    connectorAnchors = [];
     constructor(host, callbacks) {
         this.host = host;
         this.callbacks = callbacks;
@@ -34,7 +39,7 @@ export class SpatialHarnessEditor {
         this.renderer.localClippingEnabled = true;
         this.renderer.outputColorSpace = THREE.SRGBColorSpace;
         this.host.replaceChildren(this.renderer.domElement);
-        this.scene.add(this.productGroup, this.cableGroup);
+        this.scene.add(this.productGroup, this.cableGroup, this.connectorGroup);
         this.scene.add(new THREE.GridHelper(3000, 60, 0x334155, 0x1e293b));
         this.scene.add(new THREE.AxesHelper(80));
         this.scene.add(new THREE.HemisphereLight(0xdbeafe, 0x111827, 2.2));
@@ -92,12 +97,29 @@ export class SpatialHarnessEditor {
         if (cable)
             this.refreshCableVisual(origin.cableId);
     }
+    /** Harness mode: wires render as thinner cores inside a shared cable sheath. */
+    get harnessMode() { return this.harnessModeValue; }
+    setHarnessMode(value) {
+        this.harnessModeValue = value;
+        this.rebuildCables();
+        this.rebuildSheaths();
+        this.rebuildConnectors();
+    }
+    /** Feeds cable grouping + connector anchors derived from the 2D document. */
+    setHarnessData(cableGroups, connectorAnchors) {
+        this.cableGroups = new Map(cableGroups.map((group) => [group.cableId, group]));
+        this.connectorAnchors = [...connectorAnchors];
+        this.rebuildSheaths();
+        this.rebuildConnectors();
+    }
     setState(state) {
         this.stateValue = structuredClone(state);
         if (!this.stateValue.cables[this.selectionValue.cableId || ''])
             this.selectionValue = { cableId: this.stateValue.cableOrder[0] || null, pointIndex: null };
         this.rebuildProduct();
         this.rebuildCables();
+        this.rebuildSheaths();
+        this.rebuildConnectors();
         this.fit();
     }
     selectCable(id) {
@@ -433,14 +455,102 @@ export class SpatialHarnessEditor {
                 });
         }
         this.attachSelectedHandle();
+        this.rebuildSheaths();
         this.render();
+    }
+    /**
+     * Rebuilds the harness sheaths: one translucent outer tube per cable group
+     * (wires sharing a cable definition) that contains 2+ cores. Each sheath
+     * follows the group's core routes, so the harness reads as a real loom.
+     */
+    rebuildSheaths() {
+        for (const mesh of this.sheathMeshes.values())
+            this.disposeMesh(mesh);
+        this.sheathMeshes.clear();
+        if (!this.harnessModeValue)
+            return;
+        const byGroup = new Map();
+        const members = new Map();
+        for (const id of this.stateValue.cableOrder) {
+            const group = this.cableGroups.get(id);
+            if (!group || group.coreCount < 2)
+                continue;
+            byGroup.set(group.groupKey, group);
+            members.set(group.groupKey, [...(members.get(group.groupKey) || []), id]);
+        }
+        for (const [groupKey, group] of byGroup) {
+            const ids = members.get(groupKey) || [];
+            if (ids.length < 2)
+                continue;
+            const spineId = ids.reduce((a, b) => (this.stateValue.cables[b]?.controlPoints.length || 0) > (this.stateValue.cables[a]?.controlPoints.length || 0) ? b : a);
+            const spineCable = this.stateValue.cables[spineId];
+            if (!spineCable)
+                continue;
+            const points = spineCable.controlPoints.map((point) => new THREE.Vector3(point.x, point.y, point.z));
+            const curve = new THREE.CatmullRomCurve3(points, false, 'centripetal', 0.35);
+            const coreRadius = Math.max(...ids.map((id) => this.stateValue.cables[id]?.diameterMm || 1));
+            const sheathRadius = (group.outerDiameterMm && group.outerDiameterMm > coreRadius)
+                ? group.outerDiameterMm / 2
+                : coreRadius * Math.max(1.6, Math.sqrt(ids.length) * 0.9);
+            const geometry = new THREE.TubeGeometry(curve, Math.max(24, points.length * 12), sheathRadius, 16, false);
+            const material = new THREE.MeshStandardMaterial({ color: 0x1f2937, roughness: 0.62, metalness: 0.08, transparent: true, opacity: 0.82 });
+            const mesh = new THREE.Mesh(geometry, material);
+            mesh.userData = { kind: 'sheath', groupKey };
+            this.sheathMeshes.set(groupKey, mesh);
+            this.cableGroup.add(mesh);
+        }
+    }
+    /**
+     * Rebuilds the parametric connector bodies at each anchor (one per component
+     * the harness plugs into): a plug body with a row of pin stubs sized from the
+     * port count and pitch.
+     */
+    rebuildConnectors() {
+        for (const object of [...this.connectorGroup.children]) {
+            this.disposeObjectTree(object);
+            this.connectorGroup.remove(object);
+        }
+        for (const anchor of this.connectorAnchors) {
+            const body = this.buildParametricConnector(anchor);
+            if (body)
+                this.connectorGroup.add(body);
+        }
+    }
+    buildParametricConnector(anchor) {
+        const count = Math.max(1, anchor.portCount);
+        const pitch = Math.max(1.5, anchor.pitchMm);
+        const width = count * pitch + 6;
+        const height = Math.max(12, pitch * 2.4);
+        const depth = 18;
+        const group = new THREE.Group();
+        group.add(new THREE.Mesh(new THREE.BoxGeometry(width, height, depth), new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.42, metalness: 0.18 })));
+        const face = new THREE.Mesh(new THREE.BoxGeometry(width + 2, height + 2, 4), new THREE.MeshStandardMaterial({ color: 0x111827, roughness: 0.35, metalness: 0.3 }));
+        face.position.z = -depth / 2 - 2;
+        group.add(face);
+        const pinMaterial = new THREE.MeshStandardMaterial({ color: 0xfacc15, roughness: 0.25, metalness: 0.85 });
+        const startX = -((count - 1) * pitch) / 2;
+        for (let i = 0; i < count; i += 1) {
+            const pin = new THREE.Mesh(new THREE.CylinderGeometry(pitch * 0.22, pitch * 0.22, 10, 10), pinMaterial);
+            pin.rotation.x = Math.PI / 2;
+            pin.position.set(startX + i * pitch, 0, -depth / 2 - 6);
+            group.add(pin);
+        }
+        group.position.set(anchor.position.x, anchor.position.y, anchor.position.z);
+        const direction = new THREE.Vector3(anchor.direction.x, anchor.direction.y, anchor.direction.z);
+        if (direction.lengthSq() > 1e-9) {
+            group.quaternion.copy(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, -1), direction.clone().normalize()));
+        }
+        group.userData = { kind: 'connector', label: anchor.label, portCount: count };
+        return group;
     }
     createCableMesh(id) {
         const cable = this.stateValue.cables[id];
         const points = cable.controlPoints.map((point) => new THREE.Vector3(point.x, point.y, point.z));
         const curve = new THREE.CatmullRomCurve3(points, false, 'centripetal', 0.35);
         const analysis = analyzeSpatialCable(cable);
-        const geometry = new THREE.TubeGeometry(curve, Math.max(16, points.length * 12), cable.diameterMm / 2, 10, false);
+        // In harness mode the cores sit inside the cable sheath, so they render thinner.
+        const radiusMm = this.harnessModeValue && this.cableGroups.has(id) ? cable.diameterMm * 0.45 : cable.diameterMm / 2;
+        const geometry = new THREE.TubeGeometry(curve, Math.max(16, points.length * 12), radiusMm, 10, false);
         const material = new THREE.MeshStandardMaterial({ color: analysis.valid && this.collisionCount(id) === 0 ? cable.color : 0xef4444, roughness: 0.48, metalness: 0.05 });
         const mesh = new THREE.Mesh(geometry, material);
         mesh.userData = { cableId: id, kind: 'cable' };

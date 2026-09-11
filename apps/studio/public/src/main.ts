@@ -54,7 +54,7 @@ import {
   textControl,
 } from './dom.js';
 import { ModalManager, toast, type ToastKind } from './modal.js';
-import { SpatialHarnessEditor, type SpatialSelection } from './spatial-editor.js';
+import { SpatialHarnessEditor, type SpatialSelection, type SpatialCableGroupInfo, type SpatialConnectorAnchor } from './spatial-editor.js';
 import type {
   BomItem,
   AssemblySyncPreview,
@@ -348,6 +348,10 @@ class StudioApplication {
       const value = this.host.toggleSnap();
       byId('toggle-snap').classList.toggle('active', value);
     });
+    byId('toggle-harness').addEventListener('click', () => {
+      this.host.setHarnessView(!this.host.harnessView);
+      byId('toggle-harness').classList.toggle('active', this.host.harnessView);
+    });
     byId('toggle-bottom').addEventListener('click', () => this.setBottomOpen(!this.bottomOpen));
     byId('close-bottom').addEventListener('click', () => this.setBottomOpen(false));
     byId('tool-route').addEventListener('click', () => this.host.autoRouteSelection());
@@ -431,6 +435,7 @@ class StudioApplication {
   private onDocumentChanged(document: EditorDocument, reason: string): void {
     this.workspace.editor.document = document;
     this.lastSaveReason = reason;
+    if (this.spatialMode) this.feedSpatialHarnessData();
     if (!reason.startsWith('preview:') && !reason.startsWith('cancel:')) {
       this.saveRevision += 1;
       this.setSaveIndicator('dirty');
@@ -683,6 +688,7 @@ class StudioApplication {
         ${fieldRow('Model', `<div class="readout">${escapeHtml(state.productModel?.name || 'Built-in fit-check fixture')}</div>`)}
         <input id="spatial-product-file" type="file" accept=".glb,model/gltf-binary" hidden />
         <div class="button-row start"><button class="primary-button" data-action="spatial-import">Import GLB</button><button class="secondary-button" data-action="spatial-fit">Fit all</button></div>
+        <div class="button-row start"><button class="secondary-button${this.spatialEditor?.harnessMode ? ' active' : ''}" data-action="spatial-harness-mode">${this.spatialEditor?.harnessMode ? '◉' : '○'} Harness mode${this.spatialEditor?.harnessMode ? '' : ' (cable sheath + connectors)'}</button></div>
         ${state.productModel ? fieldRow('Source unit in mm', textControl('spatial-source-scale', state.productModel.sourceUnitScaleMm, { type: 'number', min: 0.000001, step: 0.1 })) : ''}
         ${fieldRow('Product opacity', textControl('spatial-opacity', state.productModel?.opacity ?? 0.42, { type: 'number', min: 0.05, max: 1, step: 0.05 }))}
         ${fieldRow('Section plane', selectControl('spatial-section-axis', 'none', ['none', 'x', 'y', 'z']))}
@@ -1267,6 +1273,13 @@ class StudioApplication {
       switch (action) {
         case 'spatial-import': query<HTMLInputElement>('#spatial-product-file', byId('right-content')).click(); break;
         case 'spatial-fit': this.spatialEditor?.fit(); break;
+        case 'spatial-harness-mode': {
+          if (!this.spatialEditor) break;
+          const next = !this.spatialEditor.harnessMode;
+          this.spatialEditor.setHarnessMode(next);
+          this.renderInspector();
+          break;
+        }
         case 'spatial-add-point': this.spatialEditor?.addControlPoint(); break;
         case 'spatial-delete-point': this.spatialEditor?.deleteControlPoint(); break;
         case 'spatial-autoroute': {
@@ -1573,11 +1586,19 @@ class StudioApplication {
     byId('canvas-shell').dataset.spatial = 'true';
     byId('spatial-host').hidden = false;
     byId('tool-rail').hidden = true;
+    this.feedSpatialHarnessData();
     this.renderViewTabs();
     this.renderBreadcrumb();
     this.renderInspector();
     this.updateCommandStates();
     this.setStatus('3D product fit-check editor · drag blue path control points to shape the harness.');
+  }
+
+  /** Pushes cable-group and connector data from the 2D document into the 3D harness editor. */
+  private feedSpatialHarnessData(): void {
+    if (!this.spatialMode || !this.spatialEditor) return;
+    const data = this.computeHarnessData(this.host.engine.document as EditorDocument);
+    this.spatialEditor.setHarnessData(data.cableGroups, data.connectorAnchors);
   }
 
   private closeSpatialView(): void {
@@ -1588,6 +1609,76 @@ class StudioApplication {
     byId('spatial-host').hidden = true;
     byId('tool-rail').hidden = false;
     this.updateCommandStates();
+  }
+
+  /**
+   * Derives the harness visual data from the 2D document: cable groups (wires
+   * sharing a cable definition form a loom) and connector anchors (each
+   * component a harness wire terminates on becomes a plug in the 3D view).
+   */
+  private computeHarnessData(document: EditorDocument): { cableGroups: SpatialCableGroupInfo[]; connectorAnchors: SpatialConnectorAnchor[] } {
+    const groups = new Map<string, { key: string; name: string; cableIds: Set<string>; outerDiameterMm?: number }>();
+    for (const wire of document.wireOrder.map((id) => document.wires[id]).filter((wire) => Boolean(wire))) {
+      const meta = wire.metadata || {};
+      const key = typeof meta.cableDefinitionId === 'string' ? `def:${meta.cableDefinitionId}`
+        : typeof meta.cableName === 'string' ? `name:${meta.cableName}`
+          : (wire.kind === 'cable-core' || wire.kind === 'bundle') ? 'unassigned' : null;
+      if (!key) continue;
+      const group = groups.get(key) || { key, name: typeof meta.cableName === 'string' ? meta.cableName as string : 'Unassigned harness', cableIds: new Set<string>(), outerDiameterMm: typeof meta.outerDiameterMm === 'number' ? meta.outerDiameterMm as number : undefined };
+      group.cableIds.add(wire.id);
+      groups.set(key, group);
+    }
+    // Expand the groupKey per cable so the 3D editor can look every member up.
+    const perCable: SpatialCableGroupInfo[] = [];
+    for (const group of [...groups.values()].filter((group) => group.cableIds.size >= 2)) {
+      for (const cableId of group.cableIds) {
+        perCable.push({ cableId, groupKey: group.key, groupName: group.name, coreCount: group.cableIds.size, outerDiameterMm: group.outerDiameterMm });
+      }
+    }
+    // Connector anchors: components that at least one harness wire terminates on.
+    const componentIds = new Set<string>();
+    for (const wire of document.wireOrder.map((id) => document.wires[id]).filter((wire) => Boolean(wire))) {
+      for (const endpoint of [wire.source, wire.target]) {
+        if (endpoint.kind === 'port') componentIds.add(endpoint.componentId);
+      }
+    }
+    const geometries = this.host.engine.geometries as Record<string, { worldBody?: { x: number; y: number; width: number; height: number }; ports?: Record<string, { center: { x: number; y: number } }> }>;
+    const connectorAnchors: SpatialConnectorAnchor[] = [];
+    for (const componentId of componentIds) {
+      const component = document.components[componentId];
+      if (!component) continue;
+      const geometry = geometries[componentId];
+      const body = geometry?.worldBody;
+      const center = body ? { x: body.x + body.width / 2, y: body.y + body.height / 2 } : component.position;
+      // Direction: from the component toward the centroid of its wire endpoints.
+      const endpoints: Array<{ x: number; y: number }> = [];
+      for (const wire of document.wireOrder.map((id) => document.wires[id]).filter((wire) => Boolean(wire))) {
+        for (const endpoint of [wire.source, wire.target]) {
+          if (endpoint.kind === 'port' && endpoint.componentId === componentId) {
+            const portGeometry = geometry?.ports?.[endpoint.portId];
+            endpoints.push(portGeometry?.center || component.position);
+          }
+        }
+      }
+      let direction = { x: 0, y: 0, z: -1 };
+      if (endpoints.length) {
+        const centroid = endpoints.reduce((acc, point) => ({ x: acc.x + point.x, y: acc.y + point.y }), { x: 0, y: 0 });
+        const dx = centroid.x / endpoints.length - center.x;
+        const dy = centroid.y / endpoints.length - center.y;
+        const length = Math.hypot(dx, dy);
+        direction = length > 1 ? { x: dx / length, y: 0, z: dy / length } : { x: 0, y: 0, z: -1 };
+      }
+      const portCount = Math.max(1, component.ports.length || 1);
+      connectorAnchors.push({
+        id: componentId,
+        label: component.designator,
+        position: { x: center.x, y: 0, z: center.y },
+        direction,
+        portCount,
+        pitchMm: 2.54,
+      });
+    }
+    return { cableGroups: perCable, connectorAnchors };
   }
 
   private async addDrawingElement(kind: DrawingKind): Promise<void> {

@@ -541,6 +541,45 @@ Not yet modeled, but treated as core by all three tools:
 
 ### 5.4 Gap list vs current schema (candidate next steps)
 
+**Status (2026-09-11):** all ten items are implemented and shipped on `main`
+(`918ed5f` data layer, `60ff279` front end, `22c533a` format spec,
+`c5f3131` type-to-connect). Per item:
+
+1. Part configurations + designation strategies — `app_part_configuration`
+   (migration 0004), CRUD API + dialog; `app_part_configuration` extends the
+   `part_spec`/BOM layer with reusable accessory recipes.
+2. Live wiring-table nodes — `wire_schedule`, `cut_list`, `connection_table`,
+   `continuity_table`, `revision_table`, and tools tables are query-backed
+   `layout_element` rows re-populated on read, and are embedded in the SVG
+   export via `drawingElements`.
+3. Formboard — `getFormboard` derives per-wire routed/set length, bend count,
+   and to-scale/not-to-scale state from the routed scene; panel grid, bend
+   radius, and step are project settings; digital-formboard JSON export
+   (`routecore-formboard/1`). Per-panel PDF is the one remaining sub-item.
+4. Destinations (type-to-connect) — re-target a wire endpoint from the
+   Properties tab, the wire context menu, or Route → "Reconnect endpoint…";
+   searches designator/pin/function/title, enforces port capacity, and can
+   detach to a free end.
+5. Cut list — enriched CSV with routed length, set length (stepped to the
+   formboard config), bend count, and formboard state.
+6. Revision table + notes — live `revision_table` drawing element; leader
+   notes remain `layout_element` rows of kind `note`. Per-row include/exclude
+   in exports is the one remaining sub-item.
+7. Linked sub-projects — assemblies are generated projections with stable
+   origin mappings and sync review; `designatorPrefix` now produces qualified
+   sub-harness designators (e.g. `Rear-J1`).
+8. Tools/fixtures table — `app_tool_fixture` with CRUD API, dialog, and a
+   live drawing table mirrored in the tools CSV export.
+9. Public versioned format spec — `docs/FILE_FORMAT_SPECIFICATION.md`
+   (`routecore-project-interchange/1`, `routecore-formboard/1`,
+   `routecore-netlist/1`, editor JSON schemaVersion 1), with versioning and
+   conformance rules.
+10. Where-used — live search across components, wires, and BOM items, seeded
+    from the current selection.
+
+Remaining known sub-items: per-panel PDF for the formboard; per-row
+include/exclude flags in the revision table export.
+
 1. Part configurations + designation strategies (extend `part_spec`).
 2. Live wiring-table node in Layout/3D rendered into exports.
 3. Formboard: panel grid, bend radius, set-length-to-scale with the to-scale/

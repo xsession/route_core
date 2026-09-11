@@ -24,6 +24,7 @@ import {
   type ViewportState,
   type WireColorPattern,
   type WireEdge,
+  type WireEndpoint,
 } from '../vendor/editor-core/index.js';
 import { StudioApi } from './api.js';
 import { CanvasHost } from './canvas-host.js';
@@ -836,6 +837,7 @@ class StudioApplication {
           ${fieldRow('Kind', selectControl('wire-kind', wire.kind, WIRE_KINDS))}
           ${fieldRow('Source', `<div class="readout">${escapeHtml(endpointLabel(wire as WireEdge, 'source', this.host.engine.document as EditorDocument))}</div>`)}
           ${fieldRow('Target', `<div class="readout">${escapeHtml(endpointLabel(wire as WireEdge, 'target', this.host.engine.document as EditorDocument))}</div>`)}
+          <div class="button-row"><button class="secondary-button" data-action="wire-reconnect-source">Reconnect source…</button><button class="secondary-button" data-action="wire-reconnect-target">Reconnect target…</button></div>
           ${fieldRow('Locked', `<input id="wire-locked" class="form-control" type="checkbox"${checked(wire.locked)} />`)}
           ${fieldRow('Hidden', `<input id="wire-hidden" class="form-control" type="checkbox"${checked(wire.hidden)} />`)}
         </div></section>
@@ -1429,6 +1431,14 @@ class StudioApplication {
           break;
         }
         case 'wire-delete': this.host.deleteSelection(true); break;
+        case 'wire-reconnect-source': {
+          if (primary?.kind === 'wire') await this.destinationDialog(primary.id, 'source');
+          break;
+        }
+        case 'wire-reconnect-target': {
+          if (primary?.kind === 'wire') await this.destinationDialog(primary.id, 'target');
+          break;
+        }
         case 'wire-clear-constraints': {
           if (primary?.kind === 'wire') this.host.engine.updateWire(primary.id, (wire) => {
             wire.routing.constraints = [];
@@ -2813,6 +2823,100 @@ class StudioApplication {
     await this.whereUsedDialog(initial);
   }
 
+  private async destinationDialog(wireId: string, end: 'source' | 'target'): Promise<void> {
+    const document = this.host.engine.document;
+    const wire = document.wires[wireId];
+    if (!wire) return;
+    const current = wire[end];
+    const opposite = wire[end === 'source' ? 'target' : 'source'];
+    // Port occupancy: count wires already attached to each port.
+    const usage = new Map<string, number>();
+    const bump = (endpoint: WireEdge['source']) => { if (endpoint.kind === 'port') usage.set(`${endpoint.componentId}:${endpoint.portId}`, (usage.get(`${endpoint.componentId}:${endpoint.portId}`) || 0) + 1); };
+    for (const id of document.wireOrder) { const w = document.wires[id]; if (id !== wireId) { bump(w.source); bump(w.target); } }
+    const rows: Array<{ componentId: string; portId: string; designator: string; portLabel: string; function: string; title: string; used: number; max: number }> = [];
+    for (const componentId of document.componentOrder) {
+      const component = document.components[componentId];
+      for (const port of component.ports || []) {
+        rows.push({
+          componentId,
+          portId: port.id,
+          designator: component.designator,
+          portLabel: port.label,
+          function: port.function || '',
+          title: component.labels?.title || component.kind,
+          used: usage.get(`${componentId}:${port.id}`) || 0,
+          max: port.connectionPolicy?.maximumConnections ?? 1,
+        });
+      }
+    }
+    let selectedRow: { componentId: string; portId: string } | null = null;
+    let freeRequested = false;
+    const body = `
+      <div class="form-grid">${fieldRow('Endpoint to change', selectControl('dst-end', end, [{ value: 'source', label: 'Source' }, { value: 'target', label: 'Target' }]))}</div>
+      <div class="callout">Current: <strong>${escapeHtml(endpointLabel(wire, end, document))}</strong> — type a designator, pin, function, or title, then pick a destination.</div>
+      <input id="dst-search" class="form-control" type="text" placeholder="Filter ports… e.g. J2, VBAT, 1" style="margin-top:10px" />
+      <div id="dst-list" class="panel-body" style="margin-top:10px;max-height:320px;overflow:auto"></div>
+      <div class="button-row" style="margin-top:10px"><button type="button" class="secondary-button" id="dst-free">Detach to free end</button></div>`;
+    await this.modal.open<{ end: 'source' | 'target'; endpoint: WireEndpoint } | undefined>({
+      title: `Connect ${escapeHtml(wire.label || wire.id)} — choose destination`,
+      subtitle: 'Type-to-connect re-targets one endpoint of the wire',
+      body,
+      size: 'large',
+      confirmLabel: 'Connect',
+      onMount: ({ body: root }) => {
+        const search = query<HTMLInputElement>('#dst-search', root);
+        const list = query<HTMLElement>('#dst-list', root);
+        const render = (term = '') => {
+          const needle = term.trim().toLowerCase();
+          const matches = rows.filter((row) => {
+            const otherIsHere = opposite.kind === 'port' && opposite.componentId === row.componentId && opposite.portId === row.portId;
+            if (otherIsHere) return false;
+            if (!needle) return true;
+            return [row.designator, row.portLabel, row.function, row.title, `${row.designator}.${row.portLabel}`]
+              .some((value) => value.toLowerCase().includes(needle));
+          });
+          if (!matches.length) { list.innerHTML = '<div class="panel-empty">No ports match.</div>'; return; }
+          list.innerHTML = matches.map((row) => {
+            const isCurrent = current.kind === 'port' && current.componentId === row.componentId && current.portId === row.portId;
+            const full = row.used >= row.max && !isCurrent;
+            const selectedRow2 = selectedRow && selectedRow.componentId === row.componentId && selectedRow.portId === row.portId;
+            return `<label class="check-row"${full ? ' title="Port is at capacity"' : ''} style="${full ? 'opacity:0.45' : ''}"><input type="radio" name="dst-port" value="${escapeAttribute(`${row.componentId}|${row.portId}`)}"${selectedRow2 ? ' checked' : ''}${full ? ' disabled' : ''} /><span><strong>${escapeHtml(`${row.designator}.${row.portLabel}`)}</strong>${row.function ? `<small>${escapeHtml(row.function)}</small>` : ''} · ${escapeHtml(row.title)} · ${row.used}/${row.max} connected${isCurrent ? ' · <em>current</em>' : ''}</span></label>`;
+          }).join('');
+        };
+        render();
+        search.addEventListener('input', () => render(search.value));
+        root.addEventListener('change', (event) => {
+          const input = (event.target as HTMLElement) as HTMLInputElement;
+          if (input.name === 'dst-port' && input.value) { const [componentId, portId] = input.value.split('|'); selectedRow = { componentId, portId }; freeRequested = false; }
+          if (input.id === 'dst-end') selectedRow = null;
+        });
+        query<HTMLButtonElement>('#dst-free', root).addEventListener('click', () => { freeRequested = true; selectedRow = null; });
+      },
+      onConfirm: ({ body: root }) => {
+        const nextEnd = query<HTMLSelectElement>('#dst-end', root).value as 'source' | 'target';
+        if (!selectedRow && !freeRequested) throw new Error('Pick a destination port or choose "Detach to free end".');
+        const point = current.kind === 'port'
+          ? this.host.engine.geometries[current.componentId]?.ports[current.portId]?.center || { x: 0, y: 0 }
+          : 'point' in current ? current.point : { x: 0, y: 0 };
+        const endpoint: WireEdge['source'] = selectedRow
+          ? { kind: 'port', componentId: selectedRow.componentId, portId: selectedRow.portId }
+          : { kind: 'free', point };
+        void root;
+        return { end: nextEnd, endpoint };
+      },
+    }).then((result) => {
+      if (!result) return;
+      try {
+        this.host.engine.reconnectWireEndpoint(wireId, result.end, result.endpoint);
+        this.host.engine.autoRoute([wireId]);
+        const updated = this.host.engine.document.wires[wireId];
+        toast('Endpoint connected', `Now: ${endpointLabel(updated, result.end, this.host.engine.document as EditorDocument)}`, 'success');
+      } catch (error) {
+        toast('Reconnect failed', errorMessage(error), 'error');
+      }
+    });
+  }
+
   private downloadExport(format: string): void {
     this.api.download(format, {
       modelId: this.workspace.workspace.activeModelId,
@@ -3024,6 +3128,7 @@ class StudioApplication {
       ],
       route: [
         { label: 'Draw wire', icon: '⌁', shortcut: 'W', action: () => this.setTool('wire') },
+        { label: 'Reconnect endpoint…', icon: '⌁', disabled: !hasWires, action: () => { const wire = selection.items.find((item) => item.kind === 'wire'); if (wire) void this.destinationDialog(wire.id, 'target'); } },
         { label: 'Auto-route selected', icon: '⌗', disabled: !hasWires && hasSelection, action: () => this.host.autoRouteSelection() },
         { label: 'Auto-route complete view', icon: '⇝', action: () => { this.host.engine.autoRoute(); } },
         { separator: true },
@@ -3144,6 +3249,8 @@ class StudioApplication {
     );
     else if (primary?.kind === 'wire') entries.push(
       { label: 'Auto-route', icon: '⌗', action: () => this.host.autoRouteSelection() },
+      { label: 'Reconnect source…', icon: '⌁', action: () => void this.destinationDialog(primary.id, 'source') },
+      { label: 'Reconnect target…', icon: '⌁', action: () => void this.destinationDialog(primary.id, 'target') },
       { label: 'Add wire label', icon: 'T', action: () => this.addLabelForWire(primary.id) },
       { label: 'Assign cable core…', icon: '≋', action: () => { this.activeLeftTab = 'library'; this.renderLeftPanel(); } },
       { label: 'Add BOM assignment…', icon: '☷', action: () => this.bomDialog() },

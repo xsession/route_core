@@ -273,3 +273,82 @@ export interface EditorCallbacks {
 }
 
 export type EditorTool = 'select' | 'pan' | 'wire' | 'label' | 'component';
+
+export interface FormboardConfig {
+  rows: number;
+  columns: number;
+  panelWidthMm: number;
+  panelHeightMm: number;
+  bendRadiusMm: number;
+  setLengthStepMm: number;
+  tolerancePpm: number;
+}
+
+export interface FormboardWire {
+  wireId: string;
+  label: string;
+  signal: string;
+  from: string;
+  to: string;
+  routedLengthMm: number;
+  setLengthMm: number;
+  bendCount: number;
+  minimumBendRadiusMm: number;
+  points: Array<{ x: number; y: number }>;
+  status: 'to-scale' | 'not-to-scale' | 'unrouted';
+}
+
+export interface FormboardData {
+  modelId: string;
+  config: FormboardConfig;
+  panel: { rows: number; columns: number; widthMm: number; heightMm: number };
+  totals: { wireCount: number; routedLengthMm: number; setLengthMm: number; bendCount: number; toScale: number };
+  wires: FormboardWire[];
+}
+
+export interface ProjectSettings {
+  formboard: FormboardConfig;
+  designation: Record<string, unknown> | null;
+  manufacturing: Record<string, unknown> | null;
+}
+
+export interface PartConfiguration {
+  id: string;
+  modelId: string;
+  entityKind: string;
+  entityId: string;
+  configKey: string;
+  name: string;
+  description: string;
+  designationStrategy: string;
+  gridRows: number;
+  gridColumns: number;
+  isDefault: boolean;
+  properties: Record<string, unknown>;
+  createdAt: string;
+  modifiedAt: string;
+}
+
+export interface ToolFixture {
+  id: string;
+  modelId: string;
+  toolKey: string;
+  name: string;
+  kind: string;
+  partNumber: string;
+  description: string;
+  bundleId: string | null;
+  quantity: number;
+  locationNote: string;
+  properties: Record<string, unknown>;
+  createdAt: string;
+  modifiedAt: string;
+}
+
+export interface WhereUsedResult {
+  query: string;
+  modelId: string | null;
+  components: Array<{ modelId: string; viewKind: string; componentId: string; designator: string; title: string; matchedField: string }>;
+  wires: Array<{ modelId: string; viewKind: string; wireId: string; label: string; signal: string; matchedField: string }>;
+  bomItems: Array<{ id: string; entityKind: string; entityId: string; partNumber: string; description: string; matchedField: string }>;
+}

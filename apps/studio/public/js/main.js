@@ -560,14 +560,14 @@ class StudioApplication {
             return;
         }
         const elements = this.workspace.drawingElements || [];
-        const labels = { dimension: 'Linked dimension', 'leader-note': 'Leader note', 'title-block': 'Title block', 'bom-table': 'Live BOM', 'wire-schedule': 'Wire schedule' };
+        const labels = { dimension: 'Linked dimension', 'leader-note': 'Leader note', 'title-block': 'Title block', 'bom-table': 'Live BOM', 'wire-schedule': 'Wire schedule', 'cut-list': 'Cut list', 'connection-table': 'Connection table', 'continuity-table': 'Continuity table', 'revision-table': 'Revision table', 'tools-table': 'Tools & fixtures' };
         root.innerHTML = `
       <section class="panel-section"><div class="panel-section-header">Manufacturing drawing</div><div class="panel-section-body">
         <div class="drawing-tool-grid">${Object.entries(labels).map(([kind, label]) => `<button class="secondary-button" data-action="drawing-add" data-drawing-kind="${kind}">${label}</button>`).join('')}</div>
         <div class="callout">Tables are query-backed and refresh from the current BOM and conductor data. Dimensions can remain linked to two selected components.</div>
       </div></section>
       <section class="panel-section"><div class="panel-section-header">Elements <span class="count">${elements.length}</span></div><div class="panel-section-body drawing-element-list">
-        ${elements.map((element) => `<div class="drawing-element-row"><span><strong>${escapeHtml(labels[element.kind] || element.kind)}</strong><small>${formatNumber(element.x)}, ${formatNumber(element.y)} · ${formatNumber(element.width)} × ${formatNumber(element.height)}</small></span><button class="row-delete" data-action="drawing-delete" data-drawing-id="${escapeAttribute(element.id)}" title="Delete drawing element">×</button></div>`).join('') || '<div class="panel-empty">No drawing elements.</div>'}
+        ${elements.map((element) => { const kindLabel = labels[element.kind] || (element.content?.title === 'TOOLS & FIXTURES' ? 'Tools & fixtures' : element.kind); return `<div class="drawing-element-row"><span><strong>${escapeHtml(kindLabel)}</strong><small>${formatNumber(element.x)}, ${formatNumber(element.y)} · ${formatNumber(element.width)} × ${formatNumber(element.height)}</small></span><button class="row-delete" data-action="drawing-delete" data-drawing-id="${escapeAttribute(element.id)}" title="Delete drawing element">×</button></div>`; }).join('') || '<div class="panel-empty">No drawing elements.</div>'}
       </div></section>
       <section class="panel-section"><div class="panel-section-header">Plan synchronization</div><div class="panel-section-body"><button class="primary-button" data-action="assembly-sync-review">Review changes before apply</button></div></section>`;
     }
@@ -1737,13 +1737,21 @@ class StudioApplication {
             'title-block': { x: 650, y: 610, width: 330, height: 95 },
             'bom-table': { x: 650, y: 60, width: 330, height: 240, query: { source: 'bom' } },
             'wire-schedule': { x: 650, y: 320, width: 330, height: 260, query: { source: 'wires' } },
+            'cut-list': { x: 650, y: 60, width: 340, height: 260 },
+            'connection-table': { x: 650, y: 340, width: 340, height: 260 },
+            'continuity-table': { x: 650, y: 620, width: 340, height: 240 },
+            'revision-table': { x: 1000, y: 60, width: 320, height: 220 },
+            'tools-table': { x: 1000, y: 300, width: 320, height: 240 },
         };
+        const isTools = kind === 'tools-table';
+        const saveContent = isTools ? { ...content, title: 'TOOLS & FIXTURES' } : content;
+        const saveKind = isTools ? 'custom' : kind;
         const saved = await this.api.put('/api/project/drawing-elements', {
             modelId: this.workspace.workspace.activeModelId,
             pageId: this.workspace.workspace.activePageId,
-            kind,
+            kind: saveKind,
             ...defaults[kind],
-            content,
+            content: saveContent,
         });
         this.workspace.drawingElements = [...this.workspace.drawingElements, saved];
         this.host.setDrawingElements(this.workspace.drawingElements);
@@ -2684,6 +2692,7 @@ class StudioApplication {
         <section class="modal-panel"><div class="modal-panel-title">Assembly identity</div><div class="modal-panel-body form-grid">
           ${fieldRow('Name', textControl('assembly-name', `Assembly ${this.workspace.models.filter((model) => model.kind === 'assembly').length + 1}`))}
           ${fieldRow('Designator', textControl('assembly-designator', `ASM-${String(this.workspace.models.filter((model) => model.kind === 'assembly').length + 1).padStart(3, '0')}`))}
+          ${fieldRow('Designator prefix', textControl('assembly-prefix', '', { placeholder: 'e.g. Rear- (qualified sub-harness names)' }))}
           ${fieldRow('Description', '<textarea id="assembly-description" class="form-textarea">Generated manufacturing assembly</textarea>', { stacked: true })}
           <div class="callout">Generation creates independent Layout and Schematic projections with stable origin mappings back to this Plan.</div>
         </div></section>
@@ -2748,6 +2757,7 @@ class StudioApplication {
                     sourceViewKind: this.workspace.workspace.activeViewKind,
                     name: query('#assembly-name', root).value.trim(),
                     designator: query('#assembly-designator', root).value.trim(),
+                    designatorPrefix: query('#assembly-prefix', root).value.trim(),
                     description: query('#assembly-description', root).value.trim(),
                     componentIds,
                     wireIds,
@@ -2756,6 +2766,234 @@ class StudioApplication {
         });
         if (result)
             await this.adoptWorkspace(result, 'Assembly generated.');
+    }
+    async formboardDialog() {
+        const modelId = this.workspace.workspace.activeModelId;
+        if (!modelId) {
+            toast('No model', 'Select a model to view its formboard.', 'warning');
+            return;
+        }
+        const data = await this.api.get(`/api/project/formboard?modelId=${encodeURIComponent(modelId)}`);
+        const config = data.config;
+        const body = `
+      <div class="callout"><strong>${data.totals.wireCount} wires · ${formatNumber(data.totals.routedLengthMm)} mm routed · ${formatNumber(data.totals.setLengthMm)} mm set · ${data.totals.bendCount} bends · ${data.totals.toScale}/${data.totals.wireCount} to scale</strong></div>
+      <div class="form-table" style="max-height:280px;overflow:auto">
+        <table class="data-table">
+          <thead><tr><th>Wire</th><th>Signal</th><th>From</th><th>To</th><th>Routed</th><th>Set</th><th>Bends</th><th>State</th></tr></thead>
+          <tbody>${data.wires.map((wire) => `<tr><td>${escapeHtml(wire.label)}</td><td>${escapeHtml(wire.signal || '—')}</td><td>${escapeHtml(wire.from)}</td><td>${escapeHtml(wire.to)}</td><td>${formatNumber(wire.routedLengthMm)}</td><td>${formatNumber(wire.setLengthMm)}</td><td>${wire.bendCount}</td><td>${escapeHtml(wire.status)}</td></tr>`).join('') || '<tr><td colspan="8">No wires.</td></tr>'}</tbody>
+        </table>
+      </div>
+      <div class="form-grid" style="margin-top:12px">
+        ${fieldRow('Panel rows', textControl('fb-rows', config.rows, { type: 'number', min: 1 }))}
+        ${fieldRow('Panel columns', textControl('fb-columns', config.columns, { type: 'number', min: 1 }))}
+        ${fieldRow('Panel width (mm)', textControl('fb-width', config.panelWidthMm, { type: 'number', min: 1 }))}
+        ${fieldRow('Panel height (mm)', textControl('fb-height', config.panelHeightMm, { type: 'number', min: 1 }))}
+        ${fieldRow('Min bend radius (mm)', textControl('fb-radius', config.bendRadiusMm, { type: 'number', min: 0 }))}
+        ${fieldRow('Set length step (mm)', textControl('fb-step', config.setLengthStepMm, { type: 'number', min: 1 }))}
+        ${fieldRow('Tolerance (ppm)', textControl('fb-tolerance', config.tolerancePpm, { type: 'number', min: 0 }))}
+      </div>
+      <div class="modal-actions" style="margin-top:12px"><button type="button" class="secondary-button" data-fb-export>Export formboard JSON…</button></div>`;
+        await this.modal.open({
+            title: 'Formboard',
+            subtitle: 'To-scale wire sets for panel fabrication',
+            body,
+            size: 'large',
+            confirmLabel: 'Save formboard settings',
+            onMount: ({ body: root }) => {
+                root.querySelector('[data-fb-export]')?.addEventListener('click', () => {
+                    this.api.download('formboard-json', { modelId });
+                    this.log('info', 'Formboard JSON export requested.');
+                });
+            },
+            onConfirm: async ({ body: root }) => {
+                await this.api.put('/api/project/settings', { formboard: {
+                        rows: Math.max(1, Math.round(Number(query('#fb-rows', root).value) || 1)),
+                        columns: Math.max(1, Math.round(Number(query('#fb-columns', root).value) || 1)),
+                        panelWidthMm: Math.max(1, Number(query('#fb-width', root).value) || 1),
+                        panelHeightMm: Math.max(1, Number(query('#fb-height', root).value) || 1),
+                        bendRadiusMm: Math.max(0, Number(query('#fb-radius', root).value) || 0),
+                        setLengthStepMm: Math.max(1, Number(query('#fb-step', root).value) || 1),
+                        tolerancePpm: Math.max(0, Number(query('#fb-tolerance', root).value) || 0),
+                    } });
+                toast('Formboard settings saved', 'Panel configuration stored in the project.', 'success');
+            },
+        });
+    }
+    async whereUsedDialog(initial = '') {
+        const body = `
+      <div class="form-grid">
+        ${fieldRow('Search', textControl('whereused-query', initial, { placeholder: 'Designator, part number, label, or signal…' }))}
+      </div>
+      <div id="whereused-results" class="panel-body" style="margin-top:10px"><div class="panel-empty">Type a term to search every model.</div></div>`;
+        await this.modal.open({
+            title: 'Where used',
+            subtitle: 'Find components, wires, and BOM items across the project',
+            body,
+            size: 'large',
+            hideFooter: true,
+            onMount: ({ body: root }) => {
+                const input = query('#whereused-query', root);
+                const target = query('#whereused-results', root);
+                const run = debounce(async () => {
+                    const term = input.value.trim();
+                    if (!term) {
+                        target.innerHTML = '<div class="panel-empty">Type a term to search every model.</div>';
+                        return;
+                    }
+                    const data = await this.api.get(`/api/project/where-used?q=${encodeURIComponent(term)}`);
+                    const total = data.components.length + data.wires.length + data.bomItems.length;
+                    if (!total) {
+                        target.innerHTML = `<div class="panel-empty">No matches for “${escapeHtml(term)}”.</div>`;
+                        return;
+                    }
+                    target.innerHTML = `
+            <div class="panel-section-header">Components <span class="count">${data.components.length}</span></div>
+            <div class="data-table-wrap">${data.components.length ? `<table class="data-table"><thead><tr><th>Designator</th><th>Title</th><th>Match</th><th>Where</th></tr></thead><tbody>${data.components.map((c) => `<tr><td>${escapeHtml(c.designator)}</td><td>${escapeHtml(c.title || '—')}</td><td>${escapeHtml(c.matchedField)}</td><td>${escapeHtml(c.viewKind)}</td></tr>`).join('')}</tbody></table>` : '<div class="panel-empty">None.</div>'}</div>
+            <div class="panel-section-header" style="margin-top:12px">Wires <span class="count">${data.wires.length}</span></div>
+            <div class="data-table-wrap">${data.wires.length ? `<table class="data-table"><thead><tr><th>Label</th><th>Signal</th><th>Match</th><th>Where</th></tr></thead><tbody>${data.wires.map((w) => `<tr><td>${escapeHtml(w.label)}</td><td>${escapeHtml(w.signal || '—')}</td><td>${escapeHtml(w.matchedField)}</td><td>${escapeHtml(w.viewKind)}</td></tr>`).join('')}</tbody></table>` : '<div class="panel-empty">None.</div>'}</div>
+            <div class="panel-section-header" style="margin-top:12px">BOM items <span class="count">${data.bomItems.length}</span></div>
+            <div class="data-table-wrap">${data.bomItems.length ? `<table class="data-table"><thead><tr><th>Part</th><th>Description</th><th>Match</th><th>Entity</th></tr></thead><tbody>${data.bomItems.map((b) => `<tr><td>${escapeHtml(b.partNumber || '—')}</td><td>${escapeHtml(b.description || '—')}</td><td>${escapeHtml(b.matchedField)}</td><td>${escapeHtml(b.entityKind)}</td></tr>`).join('')}</tbody></table>` : '<div class="panel-empty">None.</div>'}</div>`;
+                }, 220);
+                input.addEventListener('input', () => { void run(); });
+                void run();
+            },
+        });
+    }
+    async toolsDialog() {
+        const modelId = this.workspace.workspace.activeModelId;
+        if (!modelId) {
+            toast('No model', 'Select a model to edit its tools.', 'warning');
+            return;
+        }
+        const tools = await this.api.get(`/api/project/tools?modelId=${encodeURIComponent(modelId)}`);
+        const body = `
+      <form class="form-grid" id="tool-form">
+        ${fieldRow('Name', textControl('tool-name', '', { placeholder: 'e.g. Crimp tool' }))}
+        ${fieldRow('Kind', selectControl('tool-kind', 'tool', ['tool', 'fixture', 'equipment', 'consumable']))}
+        ${fieldRow('Part number', textControl('tool-part', ''))}
+        ${fieldRow('Quantity', textControl('tool-qty', 1, { type: 'number', min: 1 }))}
+        ${fieldRow('Location', textControl('tool-location', '', { placeholder: 'Kit, shelf, station…' }))}
+        ${fieldRow('Description', '<textarea id="tool-description" class="form-textarea"></textarea>', { stacked: true })}
+      </form>
+      <button type="submit" form="tool-form" class="primary-button" style="margin-top:10px">Save tool</button>
+      <div id="tool-list" class="panel-body" style="margin-top:12px">${this.renderToolRows(tools)}</div>
+      <div class="callout">Rows are keyed by name (one per model). Save upserts; delete removes the row. The “Tools & fixtures” drawing table mirrors this list.</div>`;
+        const renderRows = (root, rows) => {
+            query('#tool-list', root).innerHTML = this.renderToolRows(rows);
+            root.querySelectorAll('[data-tool-delete]').forEach((button) => button.addEventListener('click', async () => {
+                await this.api.delete(`/api/project/tools/${encodeURIComponent(button.dataset.toolDelete)}`);
+                const next = rows.filter((row) => row.id !== button.dataset.toolDelete);
+                renderRows(root, next);
+                toast('Tool removed', '', 'success');
+            }));
+        };
+        await this.modal.open({
+            title: 'Tools & fixtures',
+            subtitle: 'Manufacturing tooling for this model',
+            body,
+            size: 'large',
+            hideFooter: true,
+            onMount: ({ body: root }) => {
+                renderRows(root, tools);
+                query('#tool-form', root).addEventListener('submit', async (event) => {
+                    event.preventDefault();
+                    const saved = await this.api.put('/api/project/tools', {
+                        modelId,
+                        name: query('#tool-name', root).value.trim(),
+                        kind: query('#tool-kind', root).value,
+                        partNumber: query('#tool-part', root).value.trim(),
+                        quantity: Math.max(1, Math.round(Number(query('#tool-qty', root).value) || 1)),
+                        locationNote: query('#tool-location', root).value.trim(),
+                        description: query('#tool-description', root).value.trim(),
+                    });
+                    const next = tools.map((row) => (row.name === saved.name ? saved : row)).includes(saved) ? tools : [...tools, saved];
+                    renderRows(root, next);
+                    query('#tool-name', root).value = '';
+                    toast('Tool saved', saved.name, 'success');
+                });
+            },
+        });
+    }
+    renderToolRows(tools) {
+        if (!tools.length)
+            return '<div class="panel-empty">No tools or fixtures recorded.</div>';
+        return `<table class="data-table"><thead><tr><th>Name</th><th>Kind</th><th>P/N</th><th>Qty</th><th>Location</th><th></th></tr></thead><tbody>${tools.map((tool) => `<tr><td>${escapeHtml(tool.name)}</td><td>${escapeHtml(tool.kind)}</td><td>${escapeHtml(tool.partNumber || '—')}</td><td>${tool.quantity}</td><td>${escapeHtml(tool.locationNote || '—')}</td><td><button type="button" class="row-delete" data-tool-delete="${escapeAttribute(tool.id)}" title="Remove">×</button></td></tr>`).join('')}</tbody></table>`;
+    }
+    async partConfigDialog() {
+        const modelId = this.workspace.workspace.activeModelId;
+        if (!modelId) {
+            toast('No model', 'Select a model to edit part configurations.', 'warning');
+            return;
+        }
+        const configs = await this.api.get(`/api/project/part-configurations?modelId=${encodeURIComponent(modelId)}`);
+        const document = this.host.engine.document;
+        const body = `
+      <form class="form-grid" id="pc-form">
+        ${fieldRow('Entity kind', selectControl('pc-entity-kind', 'component', [{ value: 'component', label: 'component' }, { value: 'cable', label: 'cable' }]))}
+        ${fieldRow('Entity (designator)', textControl('pc-entity-id', '', { placeholder: document.componentOrder[0] ? this.host.engine.document.components[document.componentOrder[0]].designator : '' }))}
+        ${fieldRow('Configuration key', textControl('pc-key', '', { placeholder: 'e.g. 2x2, shielded' }))}
+        ${fieldRow('Name', textControl('pc-name', ''))}
+        ${fieldRow('Designation strategy', selectControl('pc-strategy', 'source', ['source', 'custom', 'sequential', 'alphabetical', 'grid']))}
+        ${fieldRow('Grid rows', textControl('pc-grid-rows', 1, { type: 'number', min: 1 }))}
+        ${fieldRow('Grid columns', textControl('pc-grid-columns', 1, { type: 'number', min: 1 }))}
+        ${fieldRow('Default for entity', '<input id="pc-default" type="checkbox" />')}
+        ${fieldRow('Description', '<textarea id="pc-description" class="form-textarea"></textarea>', { stacked: true })}
+      </form>
+      <button type="submit" form="pc-form" class="primary-button" style="margin-top:10px">Save configuration</button>
+      <div id="pc-list" class="panel-body" style="margin-top:12px">${this.renderPartConfigRows(configs)}</div>
+      <div class="callout">A part configuration names an accessory/variant recipe for a component or cable and how its instances are designated. One configuration per entity is marked default.</div>`;
+        const renderRows = (root, rows) => {
+            query('#pc-list', root).innerHTML = this.renderPartConfigRows(rows);
+            root.querySelectorAll('[data-pc-delete]').forEach((button) => button.addEventListener('click', async () => {
+                await this.api.delete(`/api/project/part-configurations/${encodeURIComponent(button.dataset.pcDelete)}`);
+                renderRows(root, rows.filter((row) => row.id !== button.dataset.pcDelete));
+                toast('Configuration removed', '', 'success');
+            }));
+        };
+        await this.modal.open({
+            title: 'Part configurations',
+            subtitle: 'Named variants and designation strategies',
+            body,
+            size: 'large',
+            hideFooter: true,
+            onMount: ({ body: root }) => {
+                renderRows(root, configs);
+                query('#pc-form', root).addEventListener('submit', async (event) => {
+                    event.preventDefault();
+                    const saved = await this.api.put('/api/project/part-configurations', {
+                        modelId,
+                        entityKind: query('#pc-entity-kind', root).value,
+                        entityId: query('#pc-entity-id', root).value.trim(),
+                        configKey: query('#pc-key', root).value.trim(),
+                        name: query('#pc-name', root).value.trim(),
+                        designationStrategy: query('#pc-strategy', root).value,
+                        gridRows: Math.max(1, Math.round(Number(query('#pc-grid-rows', root).value) || 1)),
+                        gridColumns: Math.max(1, Math.round(Number(query('#pc-grid-columns', root).value) || 1)),
+                        isDefault: query('#pc-default', root).checked,
+                        description: query('#pc-description', root).value.trim(),
+                    });
+                    const next = configs.some((row) => row.id === saved.id) ? configs.map((row) => (row.id === saved.id ? saved : row)) : [...configs, saved];
+                    renderRows(root, next);
+                    query('#pc-key', root).value = '';
+                    toast('Configuration saved', saved.name || saved.configKey, 'success');
+                });
+            },
+        });
+    }
+    renderPartConfigRows(configs) {
+        if (!configs.length)
+            return '<div class="panel-empty">No part configurations recorded.</div>';
+        return `<table class="data-table"><thead><tr><th>Entity</th><th>Key</th><th>Name</th><th>Strategy</th><th>Default</th><th></th></tr></thead><tbody>${configs.map((config) => `<tr><td>${escapeHtml(`${config.entityKind}:${config.entityId}`)}</td><td>${escapeHtml(config.configKey)}</td><td>${escapeHtml(config.name || '—')}</td><td>${escapeHtml(config.designationStrategy)}</td><td>${config.isDefault ? '●' : ''}</td><td><button type="button" class="row-delete" data-pc-delete="${escapeAttribute(config.id)}" title="Remove">×</button></td></tr>`).join('')}</tbody></table>`;
+    }
+    async whereUsedFromSelection() {
+        const primary = this.host.engine.selection.items[0];
+        const document = this.host.engine.document;
+        let initial = '';
+        if (primary?.kind === 'component')
+            initial = document.components[primary.id]?.designator || '';
+        else if (primary?.kind === 'wire')
+            initial = document.wires[primary.id]?.label || '';
+        await this.whereUsedDialog(initial);
     }
     downloadExport(format) {
         this.api.download(format, {
@@ -2974,6 +3212,12 @@ class StudioApplication {
             ],
             tools: [
                 { label: 'Generate assembly…', icon: '◇', action: () => this.generateAssemblyDialog() },
+                { separator: true },
+                { label: 'Formboard…', icon: '▤', action: () => this.formboardDialog() },
+                { label: 'Where used…', icon: '⌕', action: () => this.whereUsedFromSelection() },
+                { label: 'Tools & fixtures…', icon: '🔧', action: () => this.toolsDialog() },
+                { label: 'Part configurations…', icon: '◱', action: () => this.partConfigDialog() },
+                { separator: true },
                 { label: 'Database integrity…', icon: '✓', action: () => this.integrityDialog() },
                 { label: 'Application settings…', icon: '⚙', action: () => this.settingsDialog() },
             ],

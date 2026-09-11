@@ -1560,15 +1560,6 @@ export class ProjectDatabase {
           const endpoint = (value) => value.kind === 'port' ? `${editor.components[value.componentId]?.designator || value.componentId}.${editor.components[value.componentId]?.ports.find((port) => port.id === value.portId)?.label || value.portId}` : value.kind;
           return [wire.label || id, wire.signal || '—', endpoint(wire.source), endpoint(wire.target)];
         });
-      } else if (row.element_kind === 'cut_list' && editor) {
-        const formboard = this.getFormboard(selectedModelId);
-        const byId = new Map(formboard.wires.map((wire) => [wire.wireId, wire]));
-        content.columns = ['WIRE', 'SIGNAL', 'FROM', 'TO', 'LENGTH MM', 'SET MM', 'BENDS'];
-        content.rows = editor.wireOrder.map((id) => {
-          const wire = editor.wires[id];
-          const detail = byId.get(id) || {};
-          return [wire.label || id, wire.signal || '—', detail.from || '—', detail.to || '—', detail.routedLengthMm ?? 0, detail.setLengthMm ?? 0, detail.bendCount ?? 0];
-        });
       } else if (row.element_kind === 'connection_table' && editor) {
         const destination = (componentId, portId) => {
           for (const wireId of editor.wireOrder) {
@@ -1602,8 +1593,20 @@ export class ProjectDatabase {
         });
       } else if (row.element_kind === 'revision_table') {
         const revisions = this.listRevisions(selectedModelId).slice(0, 12);
+        const excluded = new Set(Array.isArray(content.excludedRevisionIds) ? content.excludedRevisionIds : []);
         content.columns = ['REV', 'NAME', 'STATE', 'DATE'];
-        content.rows = revisions.map((revision) => [revision.name, revision.message || '—', revision.lifecycleState, (revision.createdAt || '').slice(0, 10)]);
+        content.rows = revisions
+          .filter((revision) => !excluded.has(revision.id))
+          .map((revision) => [revision.name, revision.message || '—', revision.lifecycleState, (revision.createdAt || '').slice(0, 10)]);
+      } else if (row.element_kind === 'cut_list' && editor) {
+        const formboard = this.getFormboard(selectedModelId);
+        const byId = new Map(formboard.wires.map((wire) => [wire.wireId, wire]));
+        content.columns = ['WIRE', 'SIGNAL', 'FROM', 'TO', 'LENGTH MM', 'SET MM', 'BENDS'];
+        content.rows = editor.wireOrder.map((id) => {
+          const wire = editor.wires[id];
+          const detail = byId.get(id) || {};
+          return [wire.label || id, wire.signal || '—', detail.from || '—', detail.to || '—', detail.routedLengthMm ?? 0, detail.setLengthMm ?? 0, detail.bendCount ?? 0];
+        });
       } else if (row.element_kind === 'custom' && content.title?.toUpperCase() === 'TOOLS & FIXTURES') {
         const tools = this.listToolFixtures(selectedModelId);
         content.columns = ['NAME', 'KIND', 'P/N', 'QTY', 'LOCATION'];

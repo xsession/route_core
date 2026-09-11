@@ -214,6 +214,59 @@ test('live manufacturing drawing tables refresh from current project data', () =
   }
 });
 
+test('revision table honors per-row include/exclude flags stored on the element', () => {
+  const { directory, project } = createProject('revision-exclude.routecore');
+  try {
+    const modelId = project.getWorkspace().editor.modelId;
+    const pageId = project.getWorkspace().editor.pageId;
+    const table = project.saveDrawingElement({ modelId, pageId, kind: 'revision-table', x: 60, y: 360, width: 240, height: 90 });
+    const first = project.createRevision({ modelId, name: 'Rev A', message: 'Initial release' });
+    const second = project.createRevision({ modelId, name: 'Rev B', message: 'Second release' });
+    assert.equal(project.listDrawingElements(modelId, pageId).find((row) => row.kind === 'revision-table').content.rows.length, 2);
+    // Exclude Rev B: the element content carries the excluded ids, refresh filters it out.
+    project.saveDrawingElement({ id: table.id, modelId, pageId, kind: 'revision-table', x: 60, y: 360, width: 240, height: 90, content: { excludedRevisionIds: [second.id] } });
+    const refreshed = project.listDrawingElements(modelId, pageId).find((row) => row.kind === 'revision-table');
+    assert.equal(refreshed.content.rows.length, 1);
+    assert.equal(refreshed.content.rows[0][0], 'Rev A');
+    assert.deepEqual(refreshed.content.excludedRevisionIds, [second.id]);
+    // Re-including restores the row.
+    project.saveDrawingElement({ id: table.id, modelId, pageId, kind: 'revision-table', x: 60, y: 360, width: 240, height: 90, content: { excludedRevisionIds: [] } });
+    const restored = project.listDrawingElements(modelId, pageId).find((row) => row.kind === 'revision-table');
+    assert.equal(restored.content.rows.length, 2);
+  } finally {
+    project.close();
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test('formboard PDF export produces a valid multi-page PDF', () => {
+  const { directory, project } = createProject('formboard-pdf.routecore');
+  try {
+    const modelId = project.getWorkspace().editor.modelId;
+    assert.ok(availableExports().some((item) => item.id === 'formboard-pdf'));
+    const output = generateExport(project, 'formboard-pdf', { modelId });
+    assert.equal(output.mediaType, 'application/pdf');
+    assert.match(output.filename, /-formboard\.pdf$/);
+    const text = output.body.toString('latin1');
+    assert.ok(text.startsWith('%PDF-1.4'));
+    assert.ok(text.includes('%%EOF'));
+    assert.ok(text.includes('/Type /Catalog'));
+    // One page per panel; defaults are 1x1 so exactly one page.
+    assert.ok(text.match(/\/Type \/Page[^s]/g).length === 1);
+    assert.ok(text.includes('FORMBOARD PANEL 1 / 1'));
+    assert.ok(text.includes('TOTALS:'));
+    // A multi-panel grid produces one page per panel.
+    project.setProjectSetting('formboard', { rows: 1, columns: 2 });
+    const multi = generateExport(project, 'formboard-pdf', { modelId });
+    const multiText = multi.body.toString('latin1');
+    assert.equal(multiText.match(/\/Type \/Page[^s]/g).length, 2);
+    assert.ok(multiText.includes('FORMBOARD PANEL 2 / 2'));
+  } finally {
+    project.close();
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
 test('manufacturing exports include set lengths, tools, connection table, and digital formboard', () => {
   const { directory, project } = createProject('exports.routecore');
   try {

@@ -567,7 +567,7 @@ class StudioApplication {
         <div class="callout">Tables are query-backed and refresh from the current BOM and conductor data. Dimensions can remain linked to two selected components.</div>
       </div></section>
       <section class="panel-section"><div class="panel-section-header">Elements <span class="count">${elements.length}</span></div><div class="panel-section-body drawing-element-list">
-        ${elements.map((element) => { const kindLabel = labels[element.kind] || (element.content?.title === 'TOOLS & FIXTURES' ? 'Tools & fixtures' : element.kind); return `<div class="drawing-element-row"><span><strong>${escapeHtml(kindLabel)}</strong><small>${formatNumber(element.x)}, ${formatNumber(element.y)} · ${formatNumber(element.width)} × ${formatNumber(element.height)}</small></span><button class="row-delete" data-action="drawing-delete" data-drawing-id="${escapeAttribute(element.id)}" title="Delete drawing element">×</button></div>`; }).join('') || '<div class="panel-empty">No drawing elements.</div>'}
+        ${elements.map((element) => { const kindLabel = labels[element.kind] || (element.content?.title === 'TOOLS & FIXTURES' ? 'Tools & fixtures' : element.kind); return `<div class="drawing-element-row"><span><strong>${escapeHtml(kindLabel)}</strong><small>${formatNumber(element.x)}, ${formatNumber(element.y)} · ${formatNumber(element.width)} × ${formatNumber(element.height)}</small></span>${element.kind === 'revision-table' ? `<button class="secondary-button" data-action="revision-visibility" data-drawing-id="${escapeAttribute(element.id)}" title="Choose which revisions appear in this table">Edit rows…</button>` : ''}<button class="row-delete" data-action="drawing-delete" data-drawing-id="${escapeAttribute(element.id)}" title="Delete drawing element">×</button></div>`; }).join('') || '<div class="panel-empty">No drawing elements.</div>'}
       </div></section>
       <section class="panel-section"><div class="panel-section-header">Plan synchronization</div><div class="panel-section-body"><button class="primary-button" data-action="assembly-sync-review">Review changes before apply</button></div></section>`;
     }
@@ -1437,6 +1437,12 @@ class StudioApplication {
                         this.host.setDrawingElements(this.workspace.drawingElements);
                         this.renderInspector();
                     }
+                    break;
+                }
+                case 'revision-visibility': {
+                    const id = target.closest('[data-drawing-id]')?.dataset.drawingId;
+                    if (id)
+                        await this.revisionVisibilityDialog(id);
                     break;
                 }
                 case 'assembly-sync-review':
@@ -2803,7 +2809,7 @@ class StudioApplication {
         ${fieldRow('Set length step (mm)', textControl('fb-step', config.setLengthStepMm, { type: 'number', min: 1 }))}
         ${fieldRow('Tolerance (ppm)', textControl('fb-tolerance', config.tolerancePpm, { type: 'number', min: 0 }))}
       </div>
-      <div class="modal-actions" style="margin-top:12px"><button type="button" class="secondary-button" data-fb-export>Export formboard JSON…</button></div>`;
+      <div class="modal-actions" style="margin-top:12px"><button type="button" class="secondary-button" data-fb-export>Export formboard JSON…</button><button type="button" class="secondary-button" data-fb-export-pdf>Export formboard PDF…</button></div>`;
         await this.modal.open({
             title: 'Formboard',
             subtitle: 'To-scale wire sets for panel fabrication',
@@ -2814,6 +2820,10 @@ class StudioApplication {
                 root.querySelector('[data-fb-export]')?.addEventListener('click', () => {
                     this.api.download('formboard-json', { modelId });
                     this.log('info', 'Formboard JSON export requested.');
+                });
+                root.querySelector('[data-fb-export-pdf]')?.addEventListener('click', () => {
+                    this.api.download('formboard-pdf', { modelId });
+                    this.log('info', 'Formboard PDF export requested (one page per panel).');
                 });
             },
             onConfirm: async ({ body: root }) => {
@@ -2995,6 +3005,60 @@ class StudioApplication {
         if (!configs.length)
             return '<div class="panel-empty">No part configurations recorded.</div>';
         return `<table class="data-table"><thead><tr><th>Entity</th><th>Key</th><th>Name</th><th>Strategy</th><th>Default</th><th></th></tr></thead><tbody>${configs.map((config) => `<tr><td>${escapeHtml(`${config.entityKind}:${config.entityId}`)}</td><td>${escapeHtml(config.configKey)}</td><td>${escapeHtml(config.name || '—')}</td><td>${escapeHtml(config.designationStrategy)}</td><td>${config.isDefault ? '●' : ''}</td><td><button type="button" class="row-delete" data-pc-delete="${escapeAttribute(config.id)}" title="Remove">×</button></td></tr>`).join('')}</tbody></table>`;
+    }
+    async revisionVisibilityDialog(elementId) {
+        const element = (this.workspace.drawingElements || []).find((value) => value.id === elementId);
+        if (!element)
+            return;
+        const modelId = this.workspace.workspace.activeModelId;
+        if (!modelId) {
+            toast('No model', 'Select a model first.', 'warning');
+            return;
+        }
+        const revisions = this.workspace.revisions.length
+            ? this.workspace.revisions
+            : await this.api.get(`/api/project/revisions?modelId=${encodeURIComponent(modelId)}`);
+        const previouslyExcluded = new Set(Array.isArray(element.content?.excludedRevisionIds) ? element.content.excludedRevisionIds : []);
+        const body = `
+      <div class="callout">Unchecked revisions are omitted from this table and its exports.</div>
+      <div class="form-table" style="max-height:300px;overflow:auto">
+        <table class="data-table">
+          <thead><tr><th></th><th>Rev</th><th>Name</th><th>State</th></tr></thead>
+          <tbody>${revisions.map((revision) => `<tr><td><input type="checkbox" data-revision-id="${escapeAttribute(revision.id)}" ${previouslyExcluded.has(revision.id) ? '' : 'checked'} /></td><td>${escapeHtml(revision.name)}</td><td>${escapeHtml(revision.message || '—')}</td><td>${escapeHtml(revision.lifecycleState)}</td></tr>`).join('') || '<tr><td colspan="4">No revisions for this model.</td></tr>'}</tbody>
+        </table>
+      </div>`;
+        await this.modal.open({
+            title: 'Revision table rows',
+            subtitle: 'Per-row include/exclude for the selected revision table',
+            body,
+            size: 'normal',
+            confirmLabel: 'Apply',
+            onConfirm: async ({ body: root }) => {
+                const excluded = [];
+                for (const checkbox of root.querySelectorAll('input[type="checkbox"][data-revision-id]')) {
+                    if (!checkbox.checked)
+                        excluded.push(checkbox.dataset.revisionId || '');
+                }
+                const saved = await this.api.put('/api/project/drawing-elements', {
+                    id: element.id,
+                    modelId,
+                    kind: element.kind,
+                    x: element.x,
+                    y: element.y,
+                    width: element.width,
+                    height: element.height,
+                    rotation: element.rotation || 0,
+                    locked: element.locked || false,
+                    query: element.query || {},
+                    style: element.style || {},
+                    content: { ...element.content, excludedRevisionIds: excluded },
+                });
+                this.workspace.drawingElements = (this.workspace.drawingElements || []).map((value) => (value.id === element.id ? saved : value));
+                this.host.setDrawingElements(this.workspace.drawingElements);
+                this.renderInspector();
+                toast('Revision rows updated', excluded.length ? `${excluded.length} revision(s) hidden from the table.` : 'All revisions shown.', 'success');
+            },
+        });
     }
     async whereUsedFromSelection() {
         const primary = this.host.engine.selection.items[0];

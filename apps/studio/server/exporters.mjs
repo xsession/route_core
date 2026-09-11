@@ -3,6 +3,7 @@ import {
   deriveEditorScene,
   renderEditorSvg,
 } from '../../../packages/harness-editor-core/dist/index.js';
+import { buildFormboardPdf } from './pdf.mjs';
 
 function csvCell(value) {
   const text = value == null ? '' : String(value);
@@ -108,6 +109,7 @@ export function availableExports() {
     { id: 'connection-table-csv', label: 'Connection table CSV', extension: 'csv', mediaType: 'text/csv' },
     { id: 'tools-csv', label: 'Tools and fixtures CSV', extension: 'csv', mediaType: 'text/csv' },
     { id: 'formboard-json', label: 'Digital formboard JSON (1:1 panels)', extension: 'json', mediaType: 'application/json' },
+    { id: 'formboard-pdf', label: 'Formboard PDF (one page per panel)', extension: 'pdf', mediaType: 'application/pdf' },
     { id: 'netlist-json', label: 'Connectivity netlist JSON', extension: 'json', mediaType: 'application/json' },
   ];
 }
@@ -302,6 +304,17 @@ export function generateExport(project, format, options = {}) {
       filename: `${safeName}-formboard.json`,
       mediaType: 'application/json; charset=utf-8',
       body: `${JSON.stringify(payload, null, 2)}\n`,
+    };
+  }
+
+  if (format === 'formboard-pdf') {
+    const board = project.getFormboard(editor.modelId);
+    const modelName = project.listModelsAndPages().models.find((entry) => entry.id === board.modelId)?.name || '';
+    return {
+      filename: `${safeName}-formboard.pdf`,
+      mediaType: 'application/pdf',
+      encoding: 'binary',
+      body: Buffer.from(buildFormboardPdf(board, { project: meta.name, modelName, exportedAt: new Date().toISOString() }), 'utf8'),
     };
   }
 

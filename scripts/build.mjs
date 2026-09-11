@@ -36,9 +36,16 @@ rmSync(threeTarget, { recursive: true, force: true });
 mkdirSync(join(threeTarget, 'addons/controls'), { recursive: true });
 mkdirSync(join(threeTarget, 'addons/loaders'), { recursive: true });
 mkdirSync(join(threeTarget, 'addons/utils'), { recursive: true });
-cpSync(join(root, 'node_modules/three/build/three.module.js'), join(threeTarget, 'three.module.js'));
+// three >= 0.180 splits the runtime: three.module.js is a re-export layer over
+// three.core.js, so the sidecar file must be vendored too or the app module
+// graph 404s on load and the whole UI fails to boot.
+for (const name of readdirSync(join(root, 'node_modules/three/build'))) {
+  if (name === 'three.module.js' || name.endsWith('.core.js')) {
+    cpSync(join(root, 'node_modules/three/build', name), join(threeTarget, name));
+  }
+}
 for (const name of ['OrbitControls.js', 'TransformControls.js']) cpSync(join(root, 'node_modules/three/examples/jsm/controls', name), join(threeTarget, 'addons/controls', name));
-cpSync(join(root, 'node_modules/three/examples/jsm/loaders/GLTFLoader.js'), join(threeTarget, 'addons/loaders/GLTFLoader.js'));
+cpSync(join(root, 'node_modules/three/examples/jsm/loaders/GLTFLoader.js'), join(threeTarget, 'addons/loaders', 'GLTFLoader.js'));
 for (const name of ['BufferGeometryUtils.js', 'SkeletonUtils.js']) cpSync(join(root, 'node_modules/three/examples/jsm/utils', name), join(threeTarget, 'addons/utils', name));
 
 console.log('Building offline studio frontend…');
@@ -69,6 +76,36 @@ for (const file of runtimeFiles) {
   }
 }
 if (remoteReferences.length) throw new Error(`Remote runtime references found:\n${remoteReferences.join('\n')}`);
+// Verify every relative/bare local import inside the public app (including the
+// vendored three files) resolves to a real file, so a split runtime (e.g.
+// three.module.js -> ./three.core.js) can never 404 in the browser.
+const publicRoot = join(root, 'apps/studio/public');
+const importMap = { three: join(publicRoot, 'vendor/three/three.module.js'), 'three/addons/': join(publicRoot, 'vendor/three/addons/') + '/' };
+const missingImports = [];
+for (const file of filesUnder(publicRoot).filter((path) => ['.js', '.mjs'].includes(extname(path)))) {
+  const text = readFileSync(file, 'utf8');
+  for (const match of text.matchAll(/(?:import|export)\s+[^;]*?from\s+['"]([^'"]+)['"]/g)) {
+    const spec = match[1];
+    if (/^(?:[a-z]+:|data:|https?:\/\/)/.test(spec)) continue;
+    let target = null;
+    if (spec === 'three') target = importMap.three;
+    else if (spec.startsWith('three/addons/')) target = importMap['three/addons/'] + spec.slice('three/addons/'.length);
+    else if (spec.startsWith('.')) target = join(dirname(file), spec);
+    else continue;
+    if (!target) continue;
+    const candidates = [target, `${target}.js`, join(target, 'index.js')];
+    if (!candidates.some((candidate) => existsSync(candidate))) missingImports.push(`${file.slice(root.length + 1)} -> ${spec}`);
+  }
+  // Side-effect imports: import 'spec';
+  for (const match of text.matchAll(/^\s*import\s+['"]([^'"]+)['"]/gm)) {
+    const spec = match[1];
+    if (!spec.startsWith('.')) continue;
+    const target = join(dirname(file), spec);
+    const candidates = [target, `${target}.js`, join(target, 'index.js')];
+    if (!candidates.some((candidate) => existsSync(candidate))) missingImports.push(`${file.slice(root.length + 1)} -> ${spec}`);
+  }
+}
+if (missingImports.length) throw new Error(`Unresolved local imports (would 404 in the browser):\n${missingImports.join('\n')}`);
 
 const manifest = {
   application: 'RouteCore Offline Studio',

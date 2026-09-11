@@ -24,6 +24,7 @@ export class SpatialHarnessEditor {
     productLoadGeneration = 0;
     productLoaded = false;
     keepOutCache = new Map();
+    dragOrigin = null;
     constructor(host, callbacks) {
         this.host = host;
         this.callbacks = callbacks;
@@ -48,7 +49,18 @@ export class SpatialHarnessEditor {
         this.transform = new TransformControls(this.camera, this.renderer.domElement);
         this.transform.setMode('translate');
         this.scene.add(this.transform.getHelper());
-        this.transform.addEventListener('dragging-changed', (event) => { this.controls.enabled = !event.value; });
+        this.transform.addEventListener('dragging-changed', (event) => {
+            if (event.value) {
+                const { cableId, pointIndex } = this.selectionValue;
+                if (cableId != null && pointIndex != null) {
+                    const point = this.stateValue.cables[cableId]?.controlPoints[pointIndex];
+                    if (point)
+                        this.dragOrigin = { cableId, pointIndex, position: new THREE.Vector3(point.x, point.y, point.z) };
+                }
+            }
+            this.dragOrigin = event.value ? this.dragOrigin : null;
+            this.controls.enabled = !event.value;
+        });
         this.transform.addEventListener('objectChange', () => this.updateSelectedPointFromHandle(false));
         this.transform.addEventListener('mouseUp', () => this.updateSelectedPointFromHandle(true));
         this.renderer.domElement.addEventListener('pointerdown', (event) => this.selectAt(event));
@@ -58,6 +70,28 @@ export class SpatialHarnessEditor {
     }
     get state() { return this.stateValue; }
     get selection() { return this.selectionValue; }
+    /** True while a 3D control-point handle is being dragged (right-click/Esc should cancel the move). */
+    get transformDragging() { return this.transform.dragging; }
+    /** Reverts the in-flight handle drag back to its origin (used by Esc / right-click cancel). */
+    cancelHandleDrag() {
+        const origin = this.dragOrigin;
+        this.transform.detach();
+        if (!origin)
+            return;
+        this.dragOrigin = null;
+        const cable = this.stateValue.cables[origin.cableId];
+        const point = cable?.controlPoints[origin.pointIndex];
+        const handle = this.handles.get(`${origin.cableId}:${origin.pointIndex}`);
+        if (point) {
+            point.x = origin.position.x;
+            point.y = origin.position.y;
+            point.z = origin.position.z;
+        }
+        if (handle)
+            handle.position.copy(origin.position);
+        if (cable)
+            this.refreshCableVisual(origin.cableId);
+    }
     setState(state) {
         this.stateValue = structuredClone(state);
         if (!this.stateValue.cables[this.selectionValue.cableId || ''])

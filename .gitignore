@@ -4,3 +4,9 @@
 node_modules/
 
 dist/
+
+# Per-machine runtime state (SQLite project files + app home), not source.
+*.routecore
+*.routecore-shm
+*.routecore-wal
+data/

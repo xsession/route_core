@@ -316,6 +316,11 @@ class StudioApplication {
     spatialHost.addEventListener('contextmenu', (event) => {
       event.preventDefault();
       event.stopPropagation();
+      // Right-click cancels an in-flight 3D handle drag.
+      if (this.spatialEditor?.transformDragging) {
+        this.spatialEditor.cancelHandleDrag();
+        this.setStatus('Cancelled 3D point move.');
+      }
     });
     byId('new-project').addEventListener('click', () => void this.newProjectDialog());
     byId('open-project').addEventListener('click', () => void this.openProjectDialog());
@@ -525,7 +530,7 @@ class StudioApplication {
         data-model-id="${escapeAttribute(page.modelId)}" data-page-id="${escapeAttribute(page.id)}" data-view-kind="${escapeAttribute(page.viewKind)}">
         <span class="view-tab-icon" aria-hidden="true">${page.viewKind === 'schematic' ? '⌁' : '⌑'}</span>${page.viewKind === 'schematic' ? 'Schematic' : page.viewKind === 'layout' ? 'Layout' : escapeHtml(page.name)}
         <span class="view-tab-purpose">${page.viewKind === 'schematic' ? 'pin-level' : model?.kind === 'assembly' ? 'drawing' : 'topology'}</span>
-      </button>`).join('') + (model?.kind === 'assembly' ? `<button class="view-tab${this.spatialMode ? ' active' : ''}" data-spatial-view="true"><span class="view-tab-icon" aria-hidden="true">3D</span>Product fit<span class="view-tab-purpose">spatial harness</span></button>` : '');
+      </button>`).join('') + (model && this.host.engine.document.wireOrder.length ? `<button class="view-tab${this.spatialMode ? ' active' : ''}" data-spatial-view="true"><span class="view-tab-icon" aria-hidden="true">3D</span>Product fit<span class="view-tab-purpose">spatial harness</span></button>` : '');
   }
 
   private renderBreadcrumb(): void {
@@ -1529,7 +1534,11 @@ class StudioApplication {
 
   private async openSpatialView(): Promise<void> {
     const model = this.workspace.models.find((value) => value.id === this.workspace.workspace.activeModelId);
-    if (model?.kind !== 'assembly') return;
+    if (!model) return;
+    if (!this.host.engine.document.wireOrder.length) {
+      this.setStatus('Add wires first — the 3D harness is built from the document\u2019s wires.');
+      return;
+    }
     if (this.workspace.workspace.activeViewKind !== 'layout') {
       const layout = pageForView(this.workspace, model.id, 'layout');
       if (!layout) return;
@@ -3120,7 +3129,7 @@ class StudioApplication {
     const shortcuts = [
       ['V', 'Select tool'], ['H / Space', 'Pan tool / temporary pan'], ['W', 'Wire tool'], ['L', 'Label tool'], ['C', 'Component placement'],
       ['Ctrl+Z', 'Undo'], ['Ctrl+Y / Ctrl+Shift+Z', 'Redo'], ['Delete', 'Delete or detach selection'], ['Arrow keys', 'Nudge selected entity'],
-      ['Ctrl+S', 'Checkpoint'], ['Ctrl+N', 'New project'], ['Ctrl+O', 'Open project'], ['Ctrl+Shift+E', 'Export'], ['F', 'Fit drawing'], ['G', 'Toggle grid'], ['Esc', 'Cancel active gesture'],
+      ['Ctrl+S', 'Checkpoint'], ['Ctrl+N', 'New project'], ['Ctrl+O', 'Open project'], ['Ctrl+Shift+E', 'Export'], ['F', 'Fit drawing / 3D view'], ['G', 'Toggle grid'], ['Esc / Right-click', 'Cancel placement, wire drawing, or 3D point drag'],
     ];
     await this.modal.open<void>({
       title: 'Keyboard shortcuts',
@@ -3288,6 +3297,12 @@ class StudioApplication {
   }
 
   private openContextMenu(screenPoint: Point, worldPoint: Point, hit?: HitResult): void {
+    // Right-click cancels any in-flight placement/drawing action instead of
+    // opening a menu (same as Esc).
+    if (this.cancelActiveAction()) {
+      byId('context-menu-root').replaceChildren();
+      return;
+    }
     const root = byId('context-menu-root');
     root.replaceChildren();
     if (hit) {
@@ -3396,10 +3411,46 @@ class StudioApplication {
     this.host.select([{ kind: 'component', id: primary.id }]);
   }
 
+  /**
+   * Cancels whatever interactive action is in flight — placement tools, an
+   * in-progress wire preview, or a 3D handle drag. Returns true when it
+   * consumed the gesture (used by Esc and by right-click on the canvas).
+   */
+  private cancelActiveAction(): boolean {
+    if (this.spatialMode) {
+      const editor = this.spatialEditor;
+      if (editor?.transformDragging) {
+        editor.cancelHandleDrag();
+        this.setStatus('Cancelled 3D point move.');
+      }
+      return true;
+    }
+    if (this.host.tool === 'component' && this.pendingPlacementId) {
+      const name = this.components.find((item) => item.id === this.pendingPlacementId)?.name || 'component';
+      this.setTool('select');
+      this.pendingPlacementId = null;
+      this.setStatus(`Cancelled ${name} placement — use the library or press C to try again.`);
+      return true;
+    }
+    if (this.host.tool === 'label') {
+      this.setTool('select');
+      this.setStatus('Cancelled label placement.');
+      return true;
+    }
+    if (this.host.tool === 'wire') {
+      this.host.cancelWirePreview();
+      this.setTool('select');
+      this.setStatus('Cancelled wire drawing.');
+      return true;
+    }
+    return false;
+  }
+
   private handleGlobalKeyDown(event: KeyboardEvent): void {
     if (isTextEntryTarget(event.target)) return;
     const ctrl = event.ctrlKey || event.metaKey;
     const key = event.key.toLowerCase();
+    if (event.key === 'Escape' && this.cancelActiveAction()) return;
     if (ctrl && key === 'n') { event.preventDefault(); void this.newProjectDialog(); return; }
     if (ctrl && key === 'o') { event.preventDefault(); void this.openProjectDialog(); return; }
     if (ctrl && key === 's') { event.preventDefault(); void this.checkpoint(); return; }

@@ -50,6 +50,7 @@ export class SpatialHarnessEditor {
   private productLoadGeneration = 0;
   private productLoaded = false;
   private readonly keepOutCache = new Map<string, SpatialKeepOutVolume | null>();
+  private dragOrigin: { cableId: string; pointIndex: number; position: THREE.Vector3 } | null = null;
 
   public constructor(host: HTMLElement, callbacks: SpatialEditorCallbacks) {
     this.host = host;
@@ -75,7 +76,17 @@ export class SpatialHarnessEditor {
     this.transform = new TransformControls(this.camera, this.renderer.domElement);
     this.transform.setMode('translate');
     this.scene.add(this.transform.getHelper());
-    this.transform.addEventListener('dragging-changed', (event) => { this.controls.enabled = !event.value; });
+    this.transform.addEventListener('dragging-changed', (event) => {
+      if (event.value) {
+        const { cableId, pointIndex } = this.selectionValue;
+        if (cableId != null && pointIndex != null) {
+          const point = this.stateValue.cables[cableId]?.controlPoints[pointIndex];
+          if (point) this.dragOrigin = { cableId, pointIndex, position: new THREE.Vector3(point.x, point.y, point.z) };
+        }
+      }
+      this.dragOrigin = event.value ? this.dragOrigin : null;
+      this.controls.enabled = !event.value;
+    });
     this.transform.addEventListener('objectChange', () => this.updateSelectedPointFromHandle(false));
     this.transform.addEventListener('mouseUp', () => this.updateSelectedPointFromHandle(true));
     this.renderer.domElement.addEventListener('pointerdown', (event) => this.selectAt(event));
@@ -86,6 +97,25 @@ export class SpatialHarnessEditor {
 
   public get state(): Readonly<SpatialHarnessDocument> { return this.stateValue; }
   public get selection(): Readonly<SpatialSelection> { return this.selectionValue; }
+  /** True while a 3D control-point handle is being dragged (right-click/Esc should cancel the move). */
+  public get transformDragging(): boolean { return this.transform.dragging; }
+  /** Reverts the in-flight handle drag back to its origin (used by Esc / right-click cancel). */
+  public cancelHandleDrag(): void {
+    const origin = this.dragOrigin;
+    this.transform.detach();
+    if (!origin) return;
+    this.dragOrigin = null;
+    const cable = this.stateValue.cables[origin.cableId];
+    const point = cable?.controlPoints[origin.pointIndex];
+    const handle = this.handles.get(`${origin.cableId}:${origin.pointIndex}`);
+    if (point) {
+      point.x = origin.position.x;
+      point.y = origin.position.y;
+      point.z = origin.position.z;
+    }
+    if (handle) handle.position.copy(origin.position);
+    if (cable) this.refreshCableVisual(origin.cableId);
+  }
 
   public setState(state: SpatialHarnessDocument): void {
     this.stateValue = structuredClone(state);

@@ -153,6 +153,10 @@ export class CanvasHost {
     redo() {
         this.engineValue.redo();
     }
+    cancelWirePreview() {
+        if (this.engineValue.isPreviewActive)
+            this.engineValue.cancelPreview();
+    }
     autoRouteSelection() {
         const wireIds = this.engineValue.selection.items.filter((item) => item.kind === 'wire').map((item) => item.id);
         this.engineValue.autoRoute(wireIds.length ? wireIds : undefined);
@@ -337,6 +341,13 @@ export class CanvasHost {
         this.shell.addEventListener('pointerdown', (event) => {
             if (!this.inputEnabled)
                 return;
+            // Right-click cancels an in-progress wire preview before the gesture
+            // reaches the interaction controller (it would otherwise open a menu).
+            if (event.button === 2 && this.toolValue === 'wire' && this.engineValue.isPreviewActive) {
+                this.engineValue.cancelPreview();
+                this.callbacks.onStatus('Cancelled wire drawing — press W to try again.');
+                return;
+            }
             this.shell.focus();
             this.lastScreenPoint = this.eventScreenPoint(event);
             const pointerEvent = this.pointerEvent(event);
